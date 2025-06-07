@@ -29,7 +29,7 @@ logs/
 *.session
 *.session-journal
 tdlib*/
-TGDB/
+TGDB*/
 
 # OS files
 .DS_Store

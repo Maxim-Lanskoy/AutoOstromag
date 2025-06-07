@@ -38,6 +38,3 @@ class Config:
     # Delays
     BUTTON_CLICK_DELAY = 1.0  # Delay after clicking buttons
     MESSAGE_READ_DELAY = 0.5  # Delay for reading messages
-    
-    # Debug
-    DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'

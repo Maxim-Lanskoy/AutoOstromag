@@ -34,7 +34,14 @@ swift build
 
 2. **Run the bot:**
 ```bash
+# Default (uses .env in current directory)
 ./starter.sh
+
+# With custom .env file
+./starter.sh --env-file /path/to/your/.env
+
+# Show help
+./starter.sh --help
 ```
 
 3. **Follow the prompts:**
@@ -43,6 +50,72 @@ swift build
    - Enter your phone number (with country code, e.g., +1234567890)
    - Enter verification code from Telegram
    - Enter 2FA password when prompted (if you have 2FA enabled)
+
+## Managing Multiple Accounts
+
+### Command Line Options
+
+The bot supports custom .env files via command line arguments, making it easy to manage multiple accounts:
+
+```bash
+# Show all available options
+swift run AutoOstromag --help
+
+# Use a custom .env file
+swift run AutoOstromag --env-file /path/to/custom.env
+
+# Combine options
+swift run AutoOstromag --env-file .env.account2
+```
+
+### Running Multiple Accounts
+
+1. **Create separate .env files for each account:**
+   ```bash
+   .env.account1    # First account credentials
+   .env.account2    # Second account credentials  
+   .env.beehunter   # Special configuration
+   ```
+
+2. **Run different accounts:**
+   ```bash
+   # Account 1
+   ./starter.sh --env-file .env.account1
+   
+   # Account 2 (in another terminal)
+   ./starter.sh --env-file .env.account2
+   
+   # Using the existing .env.beehunter
+   ./starter.sh --env-file .env.beehunter
+   
+   # Or use the helper script to run multiple bots at once (macOS)
+   ./run_multiple.sh
+   ```
+
+### .env File Format
+
+Each .env file should contain:
+```
+API_ID=your_api_id
+API_HASH=your_api_hash
+PHONE_NUMBER=+1234567890
+```
+
+### Session Management
+
+The bot automatically creates separate session directories for each account based on the .env file name:
+- `.env` → `TGDB_default/`
+- `.env.beehunter` → `TGDB_beehunter/`
+- `.env.account1` → `TGDB_account1/`
+- `custom-config.env` → `TGDB_custom-config/`
+
+This ensures that each account maintains its own session and doesn't interfere with others
+
+### Tips
+
+- If no `--env-file` is specified, the bot looks for `.env` in the current directory
+- If the .env file is not found, you'll be prompted to enter credentials manually
+- The bot will create session files that persist authentication between runs
 
 ## How It Works
 
@@ -68,7 +141,9 @@ The bot monitors messages from the "Таємниці Королівства Ос
 - `Swift/Ostromag.swift` - Main bot implementation with TDLibKit
 - `Package.swift` - Swift package configuration  
 - `starter.sh` - Build and run script
-- `README_SWIFT.md` - This documentation
+- `run_multiple.sh` - Helper script to run multiple bot instances
+- `README.md` - This documentation
+- `DEVELOPMENT_SUMMARY.md` - Development history and technical details
 
 ## Automation Flow
 

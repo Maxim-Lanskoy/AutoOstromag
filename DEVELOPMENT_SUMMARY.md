@@ -105,8 +105,49 @@ Main Loop (game_bot.py):
 
 1. Check `README.md` for full documentation
 2. Review `modules/game_bot.py` for main logic
-3. Test changes with `DEBUG=True` in `.env`
-4. Keep delays human-like to avoid detection
+3. Keep delays human-like to avoid detection
 
 ---
 *This bot simulates a human player grinding levels. It's intentionally simple and focused on reliability over complex features.*
+
+## Swift Migration (Latest)
+
+### Major Architecture Change
+
+The bot has been completely rewritten from Python/Telethon to Swift/TDLibKit:
+
+1. **New Implementation**:
+   - Swift-based using TDLibKit (native Telegram API)
+   - Modern async/await concurrency
+   - Static message handling to avoid concurrency issues
+   - Improved authentication flow with 2FA support
+
+2. **Command Line Arguments** (NEW):
+   - Added ArgumentParser for flexible configuration
+   - `--env-file` option to specify custom .env files
+   - `--help` for usage information
+   - Supports multiple accounts with different .env files
+
+3. **Usage Examples**:
+   ```bash
+   # Default .env
+   ./starter.sh
+   
+   # Custom .env file
+   ./starter.sh --env-file .env.beehunter
+   
+   ./starter.sh --env-file .env.account2
+   ```
+
+4. **Key Files**:
+   - `Swift/Ostromag.swift` - Main bot implementation
+   - `Package.swift` - Dependencies (TDLibKit, SwiftDotenv, ArgumentParser)
+   - `starter.sh` - Build and run script with argument passthrough
+
+5. **Session Management**:
+   - Sessions stored in separate directories for each account:
+     - `.env` uses `TGDB_default/`
+     - `.env.beehunter` uses `TGDB_beehunter/`
+     - Each account has its own session, preventing conflicts
+   - Persistent authentication between runs
+   - Debug mode shows which session directory is being used
