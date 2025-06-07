@@ -21,11 +21,12 @@ class Config:
     
     # Battle settings
     BATTLE_DELAY = 1.0  # Delay between battle actions (seconds)
-    MIN_HEALTH_TO_EXPLORE = 200  # Changed from 40 to 200 - won't start battles below this HP
+    
+    # Health management
     MIN_HEALTH_PERCENT_TO_EXPLORE = 80  # Minimum health percentage required to safely explore
     
     # Energy settings
-    ENERGY_STATUS_CHECK_INTERVAL = 30  # Check character status every N seconds during energy wait
+    ENERGY_STATUS_CHECK_INTERVAL = 180  # Check character status every N seconds during energy wait
     
     # Health settings
     HP_STATUS_CHECK_INTERVAL = 120  # Check character status every N seconds during HP wait (2 minutes)

@@ -190,7 +190,7 @@ Key settings in `config.py`:
 GAME_BOT_USERNAME = '@ostromag_game_bot'
 
 # Health management
-MIN_HEALTH_TO_EXPLORE = 40  # Won't fight below this HP
+MIN_HEALTH_PERCENT_TO_EXPLORE = 80  # Minimum health percentage required to safely explore
 
 # Battle settings
 BATTLE_DELAY = 2.5  # Seconds between attack clicks
