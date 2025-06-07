@@ -186,14 +186,14 @@ class GameBot:
                             await asyncio.sleep(min(wait_time + 5, 60))
                         continue
                 
-                # Check HP - need at least 80% HP to fight safely
+                # Check HP - need at least {MIN_HEALTH_PERCENT_TO_EXPLORE}% HP to fight safely
                 hp_percentage = (self.current_hp / self.max_hp) * 100
-                if hp_percentage < 80:
+                if hp_percentage < self.config.MIN_HEALTH_PERCENT_TO_EXPLORE:
                     logger.info(f"Low HP: {self.current_hp}/{self.max_hp} ({hp_percentage:.1f}%). Waiting for regeneration...")
                     # HP regenerates ~0.6 per minute
-                    hp_needed = (self.max_hp * 0.8) - self.current_hp
+                    hp_needed = (self.max_hp * (self.config.MIN_HEALTH_PERCENT_TO_EXPLORE / 100)) - self.current_hp
                     wait_minutes = 5  # Add buffer
-                    logger.info(f"Waiting {wait_minutes} minutes for HP regeneration to 80%...")
+                    logger.info(f"Waiting {wait_minutes} minutes for HP regeneration to {self.config.MIN_HEALTH_PERCENT_TO_EXPLORE}%...")
                     
                     # Check status every 2 minutes to detect manual healing
                     check_interval_minutes = self.config.HP_STATUS_CHECK_INTERVAL / 60
@@ -208,7 +208,7 @@ class GameBot:
                         await self.check_character_status()
                         hp_percentage = (self.current_hp / self.max_hp) * 100
                         
-                        if hp_percentage >= 80:
+                        if hp_percentage >= self.config.MIN_HEALTH_PERCENT_TO_EXPLORE:
                             logger.info(f"HP restored to {self.current_hp}/{self.max_hp} ({hp_percentage:.1f}%)!")
                             break
                         else:

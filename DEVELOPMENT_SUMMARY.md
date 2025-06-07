@@ -43,7 +43,7 @@ This is an automated Telegram userbot for the Ukrainian RPG game "Таємниц
    - Varies between 0.5-2.5 seconds
 
 3. **Safety Improvements**:
-   - Won't explore if HP < 80% of max HP
+   - Won't explore if HP < 90% of max HP
    - Tracks energy regeneration time
    - Recovers from unknown states
 
@@ -55,7 +55,7 @@ This is an automated Telegram userbot for the Ukrainian RPG game "Таємниц
    - Added enemy flee detection ("занудьгував і втік")
 
 2. **Health Safety Improvements**:
-   - Changed from fixed HP threshold to percentage-based (80% HP required)
+   - Changed from fixed HP threshold to percentage-based (90% HP required)
    - Properly calculates wait time based on actual HP regeneration rate
    - Works with any max HP value (250, 300, etc.)
 
