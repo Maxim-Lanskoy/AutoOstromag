@@ -14,19 +14,19 @@ fileprivate let isTest: Bool = true
 
 @main private struct Ostromag: AsyncParsableCommand {
     
-    static let configuration = CommandConfiguration(
+    static fileprivate let configuration = CommandConfiguration(
         commandName: "AutoOstromag",
         abstract: "A Telegram user-bot for automating the Ostromag game.",
         discussion: "Automatically explores, fights enemies, and manages resources in the game."
     )
     
     @Option(name: .shortAndLong, help: "Path to the .env file")
-    var envFile: String?
+    private var envFile: String?
             
-    mutating func run() async throws {
+    mutating fileprivate func run() async throws {
         // Determine the .env file path
         let envPath: String
-        if let customPath = envFile {
+        if let customPath = self.envFile {
             envPath = customPath
             print("📁 Using custom .env file: \(envPath)")
         } else {
@@ -56,16 +56,16 @@ class OstromagBot {
     private var client: TDLibClient?
     internal let sessionName: String
     
-    init(envPath: String) throws {
+    fileprivate init(envPath: String) throws {
         
         // Determine session name from env file path
         let envFileName = URL(fileURLWithPath: envPath).lastPathComponent
         if envFileName.hasPrefix(".env") && envFileName != ".env" {
             // Extract suffix from .env.something -> "something"
             let suffix = String(envFileName.dropFirst(4))
-            self.sessionName = suffix.isEmpty ? "default" : suffix
+            self.sessionName = suffix.isEmpty ? "Default" : suffix
         } else if envFileName == ".env" {
-            self.sessionName = "default"
+            self.sessionName = "Default"
         } else {
             // Use the whole filename without extension
             self.sessionName = URL(fileURLWithPath: envPath).deletingPathExtension().lastPathComponent
@@ -75,19 +75,19 @@ class OstromagBot {
         if FileManager.default.fileExists(atPath: envPath) {
             try Dotenv.configure(atPath: envPath, overwrite: false)
             print("🔍 Loaded .env file from: \(envPath)")
-            print("🔍 Using session name: \(sessionName)")
+            print("🔍 Using session name: \(self.sessionName)")
         } else {
             print("🔍 No .env file found, will prompt for credentials")
-            print("🔍 Using session name: \(sessionName)")
+            print("🔍 Using session name: \(self.sessionName)")
         }
         
         self.manager = TDLibClientManager()
     }
     
-    func start() async throws {
+    fileprivate func start() async throws {
         print("🚀 Starting Ostromag automation bot...")
         
-        client = manager.createClient { data, client in
+        self.client = self.manager.createClient { data, client in
             DispatchQueue.global().async {
                 Task {
                     await OstromagBot.handleStaticUpdate(data: data, client: client)
@@ -95,7 +95,7 @@ class OstromagBot {
             }
         }
         
-        guard let client = client else {
+        guard let client = self.client else {
             fatalError("Client Error. Failed to create client.")
         }
         
@@ -104,7 +104,7 @@ class OstromagBot {
         print("✅ Bot authenticated successfully!")
         print("🎮 Starting game automation...")
         
-        await runGameLoop()
+        await self.runGameLoop()
     }
                 
     private func runGameLoop() async {

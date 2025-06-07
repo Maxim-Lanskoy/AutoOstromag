@@ -16,7 +16,7 @@ internal extension OstromagBot {
             
             switch update {
             case .updateNewMessage(let newMessage):
-                await handleStaticGameMessage(message: newMessage.message, client: client)
+                await self.handleStaticGameMessage(message: newMessage.message, client: client)
             default:
                 break
             }
@@ -25,7 +25,7 @@ internal extension OstromagBot {
         }
     }
     
-    static func handleStaticGameMessage(message: Message, client: TDLibClient) async {
+    static private func handleStaticGameMessage(message: Message, client: TDLibClient) async {
         guard let chat = try? await client.getChat(chatId: message.chatId),
               chat.title == "Таємниці Королівства Остромаг" else {
             return
@@ -38,10 +38,10 @@ internal extension OstromagBot {
         let text = textContent.text.text
         print("📨 Game message: \(text)")
         
-        await processStaticGameState(text: text, client: client, chatId: message.chatId)
+        await self.processStaticGameState(text: text, client: client, chatId: message.chatId)
     }
     
-    static func processStaticGameState(text: String, client: TDLibClient, chatId: Int64) async {
+    static private func processStaticGameState(text: String, client: TDLibClient, chatId: Int64) async {
         try? await Task.sleep(nanoseconds: 2_000_000_000)
         
         // Check for energy shortage - wait longer
@@ -65,7 +65,7 @@ internal extension OstromagBot {
         if text.contains("Ви отримали:") && text.contains("золота") {
             print("🏆 Battle won! Continuing exploration...")
             try? await Task.sleep(nanoseconds: 2_000_000_000)
-            await sendStaticInlineButton(client: client, chatId: chatId, text: "🗺️ Досліджувати (⚡1)")
+            await self.sendStaticInlineButton(client: client, chatId: chatId, text: "🗺️ Досліджувати (⚡1)")
             return
         }
         
@@ -74,7 +74,7 @@ internal extension OstromagBot {
            text.contains("🗿") || text.contains("🤝") || text.contains("🗺️") {
             print("🎯 Found something - continuing exploration...")
             try? await Task.sleep(nanoseconds: 1_000_000_000)
-            await sendStaticInlineButton(client: client, chatId: chatId, text: "🗺️ Досліджувати (⚡1)")
+            await self.sendStaticInlineButton(client: client, chatId: chatId, text: "🗺️ Досліджувати (⚡1)")
             return
         }
         
@@ -87,11 +87,11 @@ internal extension OstromagBot {
         // Default exploration if no specific case
         if !text.contains("❌") && !text.contains("---") {
             print("🗺️ Default: Starting exploration...")
-            await sendStaticInlineButton(client: client, chatId: chatId, text: "🗺️ Досліджувати (⚡1)")
+            await self.sendStaticInlineButton(client: client, chatId: chatId, text: "🗺️ Досліджувати (⚡1)")
         }
     }
     
-    static func sendStaticInlineButton(client: TDLibClient, chatId: Int64, text: String) async {
+    static private func sendStaticInlineButton(client: TDLibClient, chatId: Int64, text: String) async {
         do {
             _ = try await client.sendMessage(
                 chatId: chatId,
@@ -113,7 +113,7 @@ internal extension OstromagBot {
         }
     }
     
-    static func sendStaticFirstInlineButton(client: TDLibClient, chatId: Int64) async {
+    static private func sendStaticFirstInlineButton(client: TDLibClient, chatId: Int64) async {
         do {
             let chatHistory = try await client.getChatHistory(
                 chatId: chatId,
