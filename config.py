@@ -22,14 +22,14 @@ class Config:
     BATTLE_DELAY = 1.0  # Delay between battle actions (seconds)
     
     # Health management
-    MAXIMUM_HEALTH_PLACEHOLDER = 250  # Placeholder for maximum health, used to calculate health percentage
+    MAXIMUM_HEALTH_PLACEHOLDER = 275  # Placeholder for maximum health, used to calculate health percentage
     MIN_HEALTH_PERCENT_TO_EXPLORE = 95  # Minimum health percentage required to safely explore
     
     # Energy settings
     ENERGY_STATUS_CHECK_INTERVAL = 180  # Check character status every N seconds during energy wait
     
     # Health settings
-    HP_STATUS_CHECK_INTERVAL = 120  # Check character status every N seconds during HP wait (2 minutes)
+    HP_STATUS_CHECK_INTERVAL = 60  # Check character status every N seconds during HP wait (2 minutes)
     
     # Auto-buy settings (DISABLED)
     AUTO_BUY_ENABLED = False  # Disabled for now
