@@ -43,9 +43,28 @@ This is an automated Telegram userbot for the Ukrainian RPG game "Таємниц
    - Varies between 0.5-2.5 seconds
 
 3. **Safety Improvements**:
-   - Won't explore if HP < 40
+   - Won't explore if HP < 80% of max HP
    - Tracks energy regeneration time
    - Recovers from unknown states
+
+### Latest Update (Fixed Battle Detection)
+
+1. **Reverted to Working Version**:
+   - Restored original battle detection logic that was working
+   - Fixed battle state handling to properly find round messages
+   - Added enemy flee detection ("занудьгував і втік")
+
+2. **Health Safety Improvements**:
+   - Changed from fixed HP threshold to percentage-based (80% HP required)
+   - Properly calculates wait time based on actual HP regeneration rate
+   - Works with any max HP value (250, 300, etc.)
+
+3. **Energy Tracking Enhanced**:
+   - Detects energy gains from exploration (+2 ⚡ енергія)
+   - Better parsing of energy from messages
+   - Continues to track energy usage from greetings
+   - **NEW**: Periodic status checks during wait times to detect manual potion usage
+   - **NEW**: Bot will immediately continue if you manually restore HP/energy with potions
 
 ### Code Architecture
 

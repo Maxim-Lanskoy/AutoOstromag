@@ -28,8 +28,8 @@ class GameBot:
         self.is_running = False
         
         # Track HP, energy and other stats
-        self.current_hp = 100
-        self.max_hp = 100
+        self.current_hp = 245
+        self.max_hp = 245
         self.current_energy = 10
         self.max_energy = 10
         self.level = 1
@@ -137,10 +137,38 @@ class GameBot:
         return 300  # Default 5 minutes if can't parse
     
     async def wait_for_energy(self, wait_seconds):
-        """Wait for energy regeneration with proper tracking"""
+        """Wait for energy regeneration with periodic status checks"""
         self.energy_regen_time = datetime.now() + timedelta(seconds=wait_seconds)
         logger.info(f"Waiting {wait_seconds} seconds for energy regeneration...")
-        await asyncio.sleep(wait_seconds + 5)  # Add 5 seconds buffer
+        
+        # Check status every 30 seconds to detect manual potion usage
+        check_interval = self.config.ENERGY_STATUS_CHECK_INTERVAL
+        elapsed = 0
+        
+        while elapsed < wait_seconds:
+            # Wait for the smaller of remaining time or check interval
+            wait_time = min(check_interval, wait_seconds - elapsed)
+            await asyncio.sleep(wait_time)
+            elapsed += wait_time
+            
+            # Check character status to see if energy was restored manually
+            if elapsed % check_interval == 0 and elapsed < wait_seconds:
+                logger.info("Checking if energy was restored manually...")
+                await self.check_character_status()
+                
+                # If we have energy now, stop waiting
+                if self.current_energy > 0:
+                    logger.info(f"Energy restored! Current: {self.current_energy}/{self.max_energy}")
+                    self.energy_regen_time = None
+                    return
+                
+            # Log remaining time
+            remaining = wait_seconds - elapsed
+            if remaining > 0 and elapsed % 60 == 0:
+                logger.info(f"Still waiting {int(remaining)} seconds for energy...")
+        
+        # Final buffer
+        await asyncio.sleep(5)
         self.current_energy = 1  # We'll have at least 1 energy after wait
         self.energy_regen_time = None
     
@@ -154,19 +182,46 @@ class GameBot:
                 if self.energy_regen_time and datetime.now() < self.energy_regen_time:
                     wait_time = (self.energy_regen_time - datetime.now()).total_seconds()
                     if wait_time > 0:
-                        logger.info(f"Still waiting {int(wait_time)} seconds for energy...")
-                        await asyncio.sleep(min(wait_time + 5, 60))
+                        # Check if energy was restored manually
+                        await self.check_character_status()
+                        if self.current_energy > 0:
+                            logger.info(f"Energy already restored! Current: {self.current_energy}/{self.max_energy}")
+                            self.energy_regen_time = None
+                        else:
+                            logger.info(f"Still waiting {int(wait_time)} seconds for energy...")
+                            await asyncio.sleep(min(wait_time + 5, 60))
                         continue
                 
-                # Check HP - need at least 40 HP to fight safely
-                if self.current_hp < 40:
-                    logger.info(f"Low HP: {self.current_hp}/{self.max_hp}. Waiting for regeneration...")
-                    # HP regenerates ~12 per 20 minutes
-                    hp_needed = 40 - self.current_hp
-                    wait_minutes = max(20, (hp_needed / 12) * 20)
-                    logger.info(f"Waiting {int(wait_minutes)} minutes for HP regeneration...")
-                    await asyncio.sleep(wait_minutes * 60)
-                    self.current_hp = min(self.max_hp, self.current_hp + int(wait_minutes * 0.6))
+                # Check HP - need at least 80% HP to fight safely
+                hp_percentage = (self.current_hp / self.max_hp) * 100
+                if hp_percentage < 80:
+                    logger.info(f"Low HP: {self.current_hp}/{self.max_hp} ({hp_percentage:.1f}%). Waiting for regeneration...")
+                    # HP regenerates ~0.6 per minute
+                    hp_needed = (self.max_hp * 0.8) - self.current_hp
+                    wait_minutes = 5  # Add buffer
+                    logger.info(f"Waiting {wait_minutes} minutes for HP regeneration to 80%...")
+                    
+                    # Check status every 2 minutes to detect manual healing
+                    check_interval_minutes = self.config.HP_STATUS_CHECK_INTERVAL / 60
+                    elapsed_minutes = 0
+                    
+                    while elapsed_minutes < wait_minutes:
+                        wait_time_minutes = min(check_interval_minutes, wait_minutes - elapsed_minutes)
+                        await asyncio.sleep(wait_time_minutes * 60)
+                        elapsed_minutes += wait_time_minutes
+                        
+                        # Check if HP was restored manually
+                        await self.check_character_status()
+                        hp_percentage = (self.current_hp / self.max_hp) * 100
+                        
+                        if hp_percentage >= 80:
+                            logger.info(f"HP restored to {self.current_hp}/{self.max_hp} ({hp_percentage:.1f}%)!")
+                            break
+                        else:
+                            remaining_minutes = wait_minutes - elapsed_minutes
+                            if remaining_minutes > 0:
+                                logger.info(f"HP: {self.current_hp}/{self.max_hp} ({hp_percentage:.1f}%). Still waiting {remaining_minutes} minutes...")
+                    
                     continue
                 
                 # Check if we think we have energy
@@ -217,7 +272,7 @@ class GameBot:
                                 self.max_hp = int(hp_match.group(2))
                                 logger.info(f"Battle started! Current HP: {self.current_hp}/{self.max_hp}")
                         # Special case: wooden chest (weak enemy)
-                        if "📦🩵 Дерев'яна Скринька" in msg.text:
+                        if "📦🪵 Дерев'яна Скринька" in msg.text:
                             logger.info("Fighting wooden chest - easy target")
                         break
                     
@@ -244,10 +299,15 @@ class GameBot:
                     
                     # Other exploration results
                     elif any(phrase in msg.text for phrase in ["Ви помітили", "Ви натрапили", 
-                                                               "Ви відкрили", "Ви виявили", "Ви чуєте"]):
+                                                               "Ви відкрили", "Ви виявили", "Ви чуєте",
+                                                               "Ви знайшли", "знайшли"]):
                         logger.info(f"Exploration result: {msg.text[:80]}...")
                         exploration_successful = True
                         self.current_energy = max(0, self.current_energy - 1)
+                        # Check for energy gain
+                        if "+2 ⚡ енергія" in msg.text:
+                            self.current_energy = min(self.max_energy, self.current_energy + 2)
+                            logger.info(f"Gained 2 energy! Current: {self.current_energy}/{self.max_energy}")
                         break
                     
                     # Special case: bee sting
@@ -342,6 +402,12 @@ class GameBot:
                         battle_ended = True
                         logger.warning("Battle lost!")
                         final_hp = 1  # Game sets HP to 1 after defeat
+                        break
+                    
+                    # Check for enemy flee
+                    elif "занудьгував і втік" in msg.text:
+                        battle_ended = True
+                        logger.info("Enemy fled!")
                         break
                     
                     # Check for level up
