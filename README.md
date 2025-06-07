@@ -18,9 +18,10 @@ This bot was developed to automate the repetitive grinding aspects of the game w
 1. **Automatic Exploration**: Continuously explores the game world when resources permit
 2. **Combat Automation**: Fights enemies by clicking attack button with human-like delays
 3. **Resource Management**: 
-   - Tracks HP and waits for regeneration when below 40 HP
+   - Tracks HP and waits for regeneration when below 80% HP
    - Monitors energy and waits exact regeneration time
    - Tracks gold and experience gains
+   - Detects and tracks energy gains from exploration
 4. **Human-like Behavior**: Random delays between 0.5-2.5 seconds for all actions
 5. **State Recovery**: Can start from any game state and recover from errors
 
@@ -38,7 +39,8 @@ This bot was developed to automate the repetitive grinding aspects of the game w
 - **Smart Initialization**: Checks character profile once at start to get real HP/energy state
 - **Automatic Battle System**: Always clicks attack button (first button) in battles
 - **Intelligent Energy Management**: Tracks energy usage accurately (including greetings)
-- **Health Safety**: Won't explore if HP < 40 to avoid deaths
+- **Health Safety**: Won't explore if HP < 80% to avoid deaths
+- **Manual Intervention Support**: Periodic status checks detect when you manually use potions
 - **Button Detection**: Automatically clicks first button on any message with inline keyboard
 - **State Recovery**: Can start from any character state and recover from errors
 - **Human-like Delays**: Randomized reaction times to appear more natural
@@ -192,12 +194,6 @@ MIN_HEALTH_TO_EXPLORE = 40  # Won't fight below this HP
 
 # Battle settings
 BATTLE_DELAY = 2.5  # Seconds between attack clicks
-
-# Human-like delays
-HUMAN_DELAY_MIN = 0.5  # Minimum reaction time
-HUMAN_DELAY_MAX = 2.0  # Maximum reaction time
-BATTLE_THINK_MIN = 1.0  # Min thinking in battles
-BATTLE_THINK_MAX = 2.5  # Max thinking in battles
 
 # Auto-buy (disabled)
 AUTO_BUY_ENABLED = False  # Set True to enable

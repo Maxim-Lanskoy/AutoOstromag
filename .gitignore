@@ -7,12 +7,19 @@ __pycache__/
 # Virtual environment
 .venv/
 
+# Swift related
+.build/
+.swiftpm/
+*.resolved
+
 # IDE
 .vscode/
+.claude/
 
 # Environment files
 .env
 .env.local
+config.json
 
 # Logs
 *.log
@@ -21,6 +28,8 @@ logs/
 # TG session related
 *.session
 *.session-journal
+tdlib*/
+TGDB/
 
 # OS files
 .DS_Store
