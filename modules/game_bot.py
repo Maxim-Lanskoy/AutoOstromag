@@ -28,8 +28,8 @@ class GameBot:
         self.is_running = False
         
         # Track HP, energy and other stats
-        self.current_hp = 250
-        self.max_hp = 250
+        self.current_hp = self.config.MAXIMUM_HEALTH_PLACEHOLDER
+        self.max_hp = self.config.MAXIMUM_HEALTH_PLACEHOLDER
         self.current_energy = 10
         self.max_energy = 10
         self.level = 1

@@ -23,7 +23,8 @@ class Config:
     BATTLE_DELAY = 1.0  # Delay between battle actions (seconds)
     
     # Health management
-    MIN_HEALTH_PERCENT_TO_EXPLORE = 80  # Minimum health percentage required to safely explore
+    MAXIMUM_HEALTH_PLACEHOLDER = 250  # Placeholder for maximum health, used to calculate health percentage
+    MIN_HEALTH_PERCENT_TO_EXPLORE = 95  # Minimum health percentage required to safely explore
     
     # Energy settings
     ENERGY_STATUS_CHECK_INTERVAL = 180  # Check character status every N seconds during energy wait
