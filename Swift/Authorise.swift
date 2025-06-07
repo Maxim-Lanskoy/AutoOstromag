@@ -1,8 +1,8 @@
 //
 //  Authorise.swift
-//  AutoOstromag
+//  Auto Ostromag
 //
-//  Created by Maxim Lanskoy on 07.06.2025.
+//  Created by LLabs Tech on 07.06.2025.
 //
 
 import TDLibKit

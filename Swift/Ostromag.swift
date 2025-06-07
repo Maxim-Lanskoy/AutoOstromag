@@ -11,6 +11,7 @@ import ArgumentParser
 @preconcurrency import TDLibKit
 
 fileprivate let isTest: Bool = true
+internal let ostromagId: Int64 = 7841884680
 
 @main private struct Ostromag: AsyncParsableCommand {
     

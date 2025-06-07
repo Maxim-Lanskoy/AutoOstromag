@@ -1,8 +1,8 @@
 //
 //  Handlers.swift
-//  AutoOstromag
+//  Auto Ostromag
 //
-//  Created by Maxim Lanskoy on 07.06.2025.
+//  Created by LLabs Tech on 07.06.2025.
 //
 
 import TDLibKit
@@ -26,8 +26,7 @@ internal extension OstromagBot {
     }
     
     static private func handleStaticGameMessage(message: Message, client: TDLibClient) async {
-        guard let chat = try? await client.getChat(chatId: message.chatId),
-              chat.title == "Таємниці Королівства Остромаг" else {
+        guard let chat = try? await client.getChat(chatId: message.chatId), chat.id == ostromagId else {
             return
         }
         
@@ -88,57 +87,6 @@ internal extension OstromagBot {
         if !text.contains("❌") && !text.contains("---") {
             print("🗺️ Default: Starting exploration...")
             await self.sendStaticInlineButton(client: client, chatId: chatId, text: "🗺️ Досліджувати (⚡1)")
-        }
-    }
-    
-    static private func sendStaticInlineButton(client: TDLibClient, chatId: Int64, text: String) async {
-        do {
-            _ = try await client.sendMessage(
-                chatId: chatId,
-                inputMessageContent: .inputMessageText(
-                    .init(
-                        clearDraft: false,
-                        linkPreviewOptions: nil,
-                        text: .init(entities: [], text: text)
-                    )
-                ),
-                messageThreadId: nil,
-                options: nil,
-                replyMarkup: nil,
-                replyTo: nil
-            )
-            print("📤 Sent: \(text)")
-        } catch {
-            print("❌ Error sending message: \(error)")
-        }
-    }
-    
-    static private func sendStaticFirstInlineButton(client: TDLibClient, chatId: Int64) async {
-        do {
-            let chatHistory = try await client.getChatHistory(
-                chatId: chatId,
-                fromMessageId: 0,
-                limit: 1,
-                offset: 0,
-                onlyLocal: false
-            )
-            
-            if let lastMessage = chatHistory.messages?.first,
-               case .messageText(_) = lastMessage.content,
-               let replyMarkup = lastMessage.replyMarkup,
-               case .replyMarkupInlineKeyboard(let keyboard) = replyMarkup,
-               let firstRow = keyboard.rows.first,
-               let firstButton = firstRow.first {
-                
-                _ = try await client.getCallbackQueryAnswer(
-                    chatId: chatId,
-                    messageId: lastMessage.id,
-                    payload: .callbackQueryPayloadData(.init(data: Data(firstButton.text.utf8)))
-                )
-                print("🔘 Pressed first button")
-            }
-        } catch {
-            print("❌ Error pressing button: \(error)")
         }
     }
 }
