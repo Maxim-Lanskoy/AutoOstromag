@@ -192,7 +192,7 @@ class GameBot:
                     logger.info(f"Low HP: {self.current_hp}/{self.max_hp} ({hp_percentage:.1f}%). Waiting for regeneration...")
                     # HP regenerates ~0.6 per minute
                     hp_needed = (self.max_hp * (self.config.MIN_HEALTH_PERCENT_TO_EXPLORE / 100)) - self.current_hp
-                    wait_minutes = 5  # Add buffer
+                    wait_minutes = 3  # Add buffer
                     logger.info(f"Waiting {wait_minutes} minutes for HP regeneration to {self.config.MIN_HEALTH_PERCENT_TO_EXPLORE}%...")
                     
                     # Check status every 2 minutes to detect manual healing
