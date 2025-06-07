@@ -28,8 +28,8 @@ class GameBot:
         self.is_running = False
         
         # Track HP, energy and other stats
-        self.current_hp = 245
-        self.max_hp = 245
+        self.current_hp = 250
+        self.max_hp = 250
         self.current_energy = 10
         self.max_energy = 10
         self.level = 1
@@ -65,10 +65,7 @@ class GameBot:
                     logger.info("Clicked start button")
                     await asyncio.sleep(1)
                     break
-            
-            # Check character status once at start
-            await self.check_character_status()
-            
+                        
             # Start main loop
             self.is_running = True
             await self.main_loop()
@@ -120,9 +117,6 @@ class GameBot:
                               f"Gold: {self.gold}")
                     break
             
-            # Go back to menu
-            await self.human_delay(0.5, 1.0)
-            await self.client.send_message(self.game_chat, "🔙 Назад")
             await asyncio.sleep(1)
             
         except Exception as e:
@@ -141,7 +135,7 @@ class GameBot:
         self.energy_regen_time = datetime.now() + timedelta(seconds=wait_seconds)
         logger.info(f"Waiting {wait_seconds} seconds for energy regeneration...")
         
-        # Check status every 30 seconds to detect manual potion usage
+        # Check status every 180 seconds to detect manual potion usage
         check_interval = self.config.ENERGY_STATUS_CHECK_INTERVAL
         elapsed = 0
         
