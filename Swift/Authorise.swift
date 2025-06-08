@@ -1,8 +1,8 @@
 //
-//  Authorise.swift
-//  Auto Ostromag
+//  🪪 Authorise.swift
+//  👩🏼‍🔬 Auto Ostromag
 //
-//  Created by LLabs Tech on 07.06.2025.
+//  Created by ⛩️ Karl Shinobi on 07.06.2025.
 //
 
 import TDLibKit
@@ -45,8 +45,8 @@ internal extension OstromagBot {
                 }
                 
                 // Create persistent session directory unique to this account
-                let sessionDir = FileManager.default.currentDirectoryPath + "/TGDB_\(self.sessionName)/Session"
-                let filesDir = FileManager.default.currentDirectoryPath + "/TGDB_\(self.sessionName)/Files"
+                let sessionDir = FileManager.default.currentDirectoryPath + "/TGDB/\(self.sessionName)/Session"
+                let filesDir = FileManager.default.currentDirectoryPath + "/TGDB/\(self.sessionName)/Files"
                 
                 print("📂 Session directory: \(sessionDir)")
                 print("📂 Files directory: \(filesDir)")
@@ -112,7 +112,7 @@ internal extension OstromagBot {
                 print("⏳ Waiting for auth state change...")
             }
             
-            try await Task.sleep(nanoseconds: 1_000_000_000)
+            try await Task.sleep(seconds: 1)
             authState = try await client.getAuthorizationState()
         }
     }

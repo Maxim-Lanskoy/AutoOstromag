@@ -1,9 +1,9 @@
 // swift-tools-version: 6.1
 //
-//  Package.swift
-//  Auto Ostromag
+//  📦 Package.swift
+//  👩🏼‍🔬 Auto Ostromag
 //
-//  Created by LLabs Tech on 07.06.2025.
+//  Created by ⛩️ Karl Shinobi on 07.06.2025.
 //
 
 import PackageDescription
@@ -11,7 +11,7 @@ import PackageDescription
 let package = Package(
     name: "AutoOstromag",
     platforms: [
-        .macOS(.v14)
+        .macOS(.v15)
     ],
     products: [
         // 🏃 The main executable for the AutoOstromag project.

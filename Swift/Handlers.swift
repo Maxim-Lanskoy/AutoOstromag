@@ -1,8 +1,8 @@
 //
-//  Handlers.swift
-//  Auto Ostromag
+//  📮 Handlers.swift
+//  👩🏼‍🔬 Auto Ostromag
 //
-//  Created by LLabs Tech on 07.06.2025.
+//  Created by ⛩️ Karl Shinobi on 07.06.2025.
 //
 
 import TDLibKit
@@ -26,7 +26,13 @@ internal extension OstromagBot {
     }
     
     static private func handleStaticGameMessage(message: Message, client: TDLibClient) async {
-        guard let chat = try? await client.getChat(chatId: message.chatId), chat.id == ostromagId else {
+        guard let chat = try? await client.getChat(chatId: message.chatId) else {
+            print("❌ Error fetching chat for message \(message.id)")
+            return
+        }
+                
+        guard chat.id == ostromagId || chat.id == beeHunters else {
+            // print("Message not from Ostromag or Bee Hunters guild chat")
             return
         }
         
@@ -41,12 +47,12 @@ internal extension OstromagBot {
     }
     
     static private func processStaticGameState(text: String, client: TDLibClient, chatId: Int64) async {
-        try? await Task.sleep(nanoseconds: 2_000_000_000)
+        try? await Task.sleep(seconds: 1)
         
         // Check for energy shortage - wait longer
         if text.contains("❌ Недостатньо енергії!") {
             print("⚡ No energy - waiting 5 minutes...")
-            try? await Task.sleep(nanoseconds: 300_000_000_000) // 5 minutes
+            try? await Task.sleep(minutes: 5) // 5 minutes
             return
         }
         
@@ -63,7 +69,7 @@ internal extension OstromagBot {
         
         if text.contains("Ви отримали:") && text.contains("золота") {
             print("🏆 Battle won! Continuing exploration...")
-            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            try? await Task.sleep(seconds: 2)
             await self.sendStaticInlineButton(client: client, chatId: chatId, text: "🗺️ Досліджувати (⚡1)")
             return
         }
@@ -72,7 +78,7 @@ internal extension OstromagBot {
         if text.contains("🕯️") || text.contains("🐝") || text.contains("🔍") || text.contains("📖") || 
            text.contains("🗿") || text.contains("🤝") || text.contains("🗺️") {
             print("🎯 Found something - continuing exploration...")
-            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            try? await Task.sleep(seconds: 1)
             await self.sendStaticInlineButton(client: client, chatId: chatId, text: "🗺️ Досліджувати (⚡1)")
             return
         }

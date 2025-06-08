@@ -1,8 +1,8 @@
 //
-//  Ostromag.swift
-//  Auto Ostromag
+//  🤖 Ostromag.swift
+//  👩🏼‍🔬 Auto Ostromag
 //
-//  Created by LLabs Tech on 07.06.2025.
+//  Created by ⛩️ Karl Shinobi on 07.06.2025.
 //
 
 import Foundation
@@ -12,8 +12,11 @@ import ArgumentParser
 
 fileprivate let isTest: Bool = true
 internal let ostromagId: Int64 = 7841884680
+internal let beeHunters: Int64 = -1002850991157
 
 @main private struct Ostromag: AsyncParsableCommand {
+    
+    public var state: State?
     
     static fileprivate let configuration = CommandConfiguration(
         commandName: "AutoOstromag",
@@ -27,6 +30,7 @@ internal let ostromagId: Int64 = 7841884680
     mutating fileprivate func run() async throws {
         // Determine the .env file path
         let envPath: String
+        
         if let customPath = self.envFile {
             envPath = customPath
             print("📁 Using custom .env file: \(envPath)")
@@ -113,8 +117,8 @@ class OstromagBot {
         
         while true {
             do {
-                try await Task.sleep(nanoseconds: 30_000_000_000)
-                print("🤖 Bot is running...")
+                try await Task.sleep(seconds: 30)
+                print("🤖 Bot is running... Ping - Pong 🫡")
             } catch {
                 print("❌ Error in game loop: \(error)")
             }

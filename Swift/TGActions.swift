@@ -1,8 +1,8 @@
 //
-//  TGActions.swift
-//  Auto Ostromag
+//  🕹️ TGActions.swift
+//  👩🏼‍🔬 Auto Ostromag
 //
-//  Created by LLabs Tech on 07.06.2025.
+//  Created by ⛩️ Karl Shinobi on 07.06.2025.
 //
 
 import TDLibKit

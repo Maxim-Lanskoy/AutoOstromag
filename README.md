@@ -1,4 +1,4 @@
-# AutoOstromag Swift Bot
+# Auto-Ostromag Swift Bot
 
 A Swift-based Telegram userbot for automating the "Таємниці Королівства Остромаг" game using TDLibKit.
 
