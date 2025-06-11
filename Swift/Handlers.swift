@@ -10,7 +10,7 @@ import Foundation
 
 internal extension OstromagBot {
         
-    static func handleStaticUpdate(data: Data, client: TDLibClient) async {
+    static func handleStaticUpdate(data: Data, client: TDLibClient) async -> State? {
         do {
             let update = try client.decoder.decode(Update.self, from: data)
             
@@ -43,35 +43,64 @@ internal extension OstromagBot {
         let text = textContent.text.text
         print("📨 Game message: \(text)")
         
-        await self.processStaticGameState(text: text, client: client, chatId: message.chatId)
+        await self.process(text: text, client: client, chatId: message.chatId)
     }
     
-    static private func processStaticGameState(text: String, client: TDLibClient, chatId: Int64) async {
+    // Represents the different states of the game play
+    //      - enum GamePlayState: String
+    //    case waitingForStart
+    //    case exploring
+    //    case battle
+    //    case waitingEnergy
+    //    case waitingHealth
+    
+    static private func process(text: String, client: TDLibClient, chatId: Int64) async {
+        
         try? await Task.sleep(seconds: 1)
+        
+        switch ??? state.gameState {
+         
+        case .waitingForStart:
+            print("🔄 Waiting for game to start...")
+            return
+            
+        case .exploring:
+            print("🌏 Exploring game world...")
+            return
+        
+        case .battle:
+            print("⚔️ Battle in progress...")
+            return
+        
+        case .waitingEnergy:
+            print("🔋 Waiting for energy to recharge...")
+            return
+        
+        case .waitingHealth:
+            print("💤 Waiting for game to start...")
+            return
+        
+        }
         
         // Check for energy shortage - wait longer
         if text.contains("❌ Недостатньо енергії!") {
             print("⚡ No energy - waiting 5 minutes...")
             try? await Task.sleep(minutes: 5) // 5 minutes
-            return
         }
         
         // Battle situations - just wait for auto-combat
         if text.contains("З'явився") && (text.contains("🐗") || text.contains("🐍") || text.contains("🐺") || text.contains("🦂")) {
             print("⚔️ Monster appeared - battle starting...")
-            return
         }
         
         if text.contains("--- Раунд") {
             print("⚔️ Battle in progress...")
-            return
         }
         
         if text.contains("Ви отримали:") && text.contains("золота") {
             print("🏆 Battle won! Continuing exploration...")
             try? await Task.sleep(seconds: 2)
             await self.sendStaticInlineButton(client: client, chatId: chatId, text: "🗺️ Досліджувати (⚡1)")
-            return
         }
         
         // Exploration events - continue exploring
@@ -80,13 +109,11 @@ internal extension OstromagBot {
             print("🎯 Found something - continuing exploration...")
             try? await Task.sleep(seconds: 1)
             await self.sendStaticInlineButton(client: client, chatId: chatId, text: "🗺️ Досліджувати (⚡1)")
-            return
         }
         
         // Greetings from other players
         if text.contains("👋") && text.contains("привітав") {
             print("👋 Player greeting detected")
-            return
         }
         
         // Default exploration if no specific case

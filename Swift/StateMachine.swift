@@ -74,6 +74,13 @@ internal struct State: Codable {
         self.gameState = gameState
         self.gold = gold
     }
+    
+    public func update(with text: String) -> State? {
+        
+        
+        
+        return nil
+    }
 }
 
 // Represents the different states of the game play

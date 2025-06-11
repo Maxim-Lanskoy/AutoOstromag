@@ -30,7 +30,12 @@ let package = Package(
                 .product(name: "SwiftDotenv", package: "swift-dotenv"),
                 .product(name: "TDLibKit", package: "TDLibKit"),
                 .product(name: "ArgumentParser", package: "swift-argument-parser")
-            ], path: "Swift"
+            ], path: "Swift", swiftSettings: swiftSettings
         )
     ]
 )
+
+
+var swiftSettings: [SwiftSetting] { [
+    .enableUpcomingFeature("ExistentialAny"),
+] }
