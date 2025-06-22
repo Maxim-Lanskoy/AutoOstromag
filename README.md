@@ -119,14 +119,19 @@ This ensures that each account maintains its own session and doesn't interfere w
 
 ## How It Works
 
-The bot monitors messages from the "Таємниці Королівства Остромаг" chat and automatically:
+The bot monitors messages from the "Таємниці Королівства Остромаг" chat and responds to commands:
+
+### 🎮 Bot Control
+- **Start**: Send `/start` in the game chat to begin automation
+- **Stop**: Send `/stop` to pause the bot
+- **Logging**: `/log all` for all notifications, `/log important` for only key events
 
 ### 🎮 Game Logic
-- **Energy Check**: Waits 5 minutes when energy is depleted
+- **Energy Check**: Waits when energy is depleted (shows exact wait time)
 - **Monster Battles**: Detects monsters and lets auto-combat resolve
 - **Exploration Events**: Continues exploring after finding items/events
 - **Victory**: Automatically continues exploring after winning battles
-- **Default Action**: Starts exploration when no specific condition is met
+- **Default Action**: Explores when resources are available
 
 ### 📝 Detected Patterns
 - `❌ Недостатньо енергії!` - Energy depletion (waits 5 minutes)
@@ -139,6 +144,12 @@ The bot monitors messages from the "Таємниці Королівства Ос
 ## Code Structure
 
 - `Swift/Ostromag.swift` - Main bot implementation with TDLibKit
+- `Swift/GameState.swift` - Simple actor-based game state
+- `Swift/Handlers.swift` - Message update handlers
+- `Swift/ActionReporter.swift` - Guild channel reporting
+- `Swift/TGActions.swift` - Telegram action helpers
+- `Swift/Authorise.swift` - Authentication flow
+- `Swift/Extensions.swift` - Swift extensions
 - `Package.swift` - Swift package configuration  
 - `starter.sh` - Build and run script
 - `run_multiple.sh` - Helper script to run multiple bot instances
@@ -152,26 +163,40 @@ The bot monitors messages from the "Таємниці Королівства Ос
     ↓
 ⚙️ Setup TDLib + Authenticate  
     ↓
+💬 Wait for /start command
+    ↓
+🤖 Bot Started (manual or auto)
+    ↓
 👂 Listen to Game Chat
     ↓
 📨 Message Received
     ↓
 🧠 Process Game State:
-    ├── ⚡ No Energy? → Wait 5 min
+    ├── 🛑 /stop? → Pause bot
+    ├── ⚡ No Energy? → Wait X min
     ├── ⚔️ Monster? → Let game handle  
     ├── 🏆 Victory? → Continue exploring
     ├── 🎯 Event? → Continue exploring
-    └── 🗺️ Default → Start exploring
+    └── 🗺️ Ready? → Explore
 ```
 
 ## Technical Details
 
 - **TDLibKit**: Native Swift wrapper for Telegram's TDLib
 - **Concurrency**: Modern async/await pattern with proper error handling
+- **State Management**: Simple actor for thread-safe game state
+  - Tracks health, energy, level, and battle status
+  - No complex architecture - just what's needed
+- **Action Reporting**: Sends activity logs to guild channel
+  - Reports all actions with current player stats
+  - Formatted status with health/energy percentages
+  - Tracks battles, items, exploration events
+  - **Technical logging**: Bot start/stop, state changes, recovery events
 - **Authentication**: Complete TDLib authentication flow
-- **Message Processing**: Static methods to avoid concurrency issues
+- **Message Processing**: Static methods with session-based state access
 - **Game State Detection**: Pattern matching on Ukrainian game text
 - **Timing**: Smart delays (2s normal, 5min for energy, 1s for events)
+- **Resource Monitoring**: Tracks health/energy and waits when needed
 
 ## Safety Features
 

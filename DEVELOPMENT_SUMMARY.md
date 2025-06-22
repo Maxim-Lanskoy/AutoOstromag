@@ -117,37 +117,48 @@ Main Loop (game_bot.py):
 The bot has been completely rewritten from Python/Telethon to Swift/TDLibKit:
 
 1. **New Implementation**:
-   - Swift-based using TDLibKit (native Telegram API)
-   - Modern async/await concurrency
-   - Static message handling to avoid concurrency issues
-   - Improved authentication flow with 2FA support
+- Swift-based using TDLibKit (native Telegram API)
+- Modern async/await concurrency
+- Simple GameState actor for thread-safe state management
+- Improved authentication flow with 2FA support
 
 2. **Command Line Arguments** (NEW):
-   - Added ArgumentParser for flexible configuration
-   - `--env-file` option to specify custom .env files
-   - `--help` for usage information
-   - Supports multiple accounts with different .env files
+- Added ArgumentParser for flexible configuration
+- `--env-file` option to specify custom .env files
+- `--help` for usage information
+- Supports multiple accounts with different .env files
 
 3. **Usage Examples**:
-   ```bash
-   # Default .env
-   ./starter.sh
-   
-   # Custom .env file
-   ./starter.sh --env-file .env.beehunter
-   
-   ./starter.sh --env-file .env.account2
-   ```
+```bash
+# Default .env
+./starter.sh
+
+# Custom .env file
+./starter.sh --env-file .env.beehunter
+
+./starter.sh --env-file .env.account2
+```
 
 4. **Key Files**:
-   - `Swift/Ostromag.swift` - Main bot implementation
-   - `Package.swift` - Dependencies (TDLibKit, SwiftDotenv, ArgumentParser)
+- `Swift/Ostromag.swift` - Main bot implementation
+- `Swift/GameState.swift` - Simple actor for game state
+- `Swift/Handlers.swift` - Message processing logic
+   - `Package.swift` - Dependencies (TDLibKit, SwiftDotenv, ArgumentParser)  
    - `starter.sh` - Build and run script with argument passthrough
 
 5. **Session Management**:
-   - Sessions stored in separate directories for each account:
-     - `.env` uses `TGDB_default/`
-     - `.env.beehunter` uses `TGDB_beehunter/`
-     - Each account has its own session, preventing conflicts
+- Sessions stored in separate directories for each account:
+- `.env` uses `TGDB_default/`
+  - `.env.beehunter` uses `TGDB_beehunter/`
+  - Each account has its own session, preventing conflicts
    - Persistent authentication between runs
    - Debug mode shows which session directory is being used
+
+### Game State Architecture (Simplified)
+
+**Pure Swift Concurrency Approach**:
+- Each `OstromagBot` instance has its own `GameState` actor
+- No NSLock, no complex managers, just a simple actor
+- Tracks only essential data: health, energy, level, battle state
+- Updates are passed through closure captures (no global state)
+- Thread-safe by design using Swift's actor model

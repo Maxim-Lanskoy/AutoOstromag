@@ -4,6 +4,9 @@
 //
 //  Created by ⛩️ Karl Shinobi on 07.06.2025.
 //
+//  Architecture: Each OstromagBot instance has its own GameState actor
+//  that tracks player stats and game state in a thread-safe way.
+//
 
 import Foundation
 import SwiftDotenv
@@ -11,12 +14,11 @@ import ArgumentParser
 @preconcurrency import TDLibKit
 
 fileprivate let isTest: Bool = true
+internal let ownerId:    Int64 = 327887608
 internal let ostromagId: Int64 = 7841884680
 internal let beeHunters: Int64 = -1002850991157
 
 @main private struct Ostromag: AsyncParsableCommand {
-    
-    public var state: State?
     
     static fileprivate let configuration = CommandConfiguration(
         commandName: "AutoOstromag",
@@ -60,6 +62,7 @@ class OstromagBot {
     private let manager: TDLibClientManager
     private var client: TDLibClient?
     internal let sessionName: String
+    internal let gameState = GameState()
     
     fileprivate init(envPath: String) throws {
         
@@ -92,10 +95,12 @@ class OstromagBot {
     fileprivate func start() async throws {
         print("🚀 Starting Ostromag automation bot...")
         
+        let sessionName = self.sessionName
+        let gameState = self.gameState
         self.client = self.manager.createClient { data, client in
             DispatchQueue.global().async {
                 Task {
-                    await OstromagBot.handleStaticUpdate(data: data, client: client)
+                    await OstromagBot.handleStaticUpdate(data: data, client: client, sessionName: sessionName, gameState: gameState)
                 }
             }
         }
@@ -104,23 +109,108 @@ class OstromagBot {
             fatalError("Client Error. Failed to create client.")
         }
         
+        // Try to suppress TDLib logs
+        do {
+             _ = try await client.setLogStream(logStream: .logStreamFile(.init(maxFileSize: 10485760, path: "/dev/null", redirectStderr: true)))
+        } catch let error {
+            print("❌ Failed to set log stream: \(error)")
+            fatalError("Log Stream Error: \(error)")
+        }
+        
         try await self.authenticateIfNeeded(client: client)
         
         print("✅ Bot authenticated successfully!")
-        print("🎮 Starting game automation...")
+        
+        let me = try await client.getMe()
+        
+        let chat = try await client.createPrivateChat(force: nil, userId: me.id)
+        
+        await self.gameState.setReportingChat(chat.id)
+                
+        // Report bot startup
+        await OstromagBot.reportAction(
+            GameAction.botStarted(session: self.sessionName), 
+            client: client, 
+            gameState: self.gameState
+        )
+        
+        // Report authentication success
+        await OstromagBot.reportAction(
+            GameAction.authenticated(), 
+            client: client, 
+            gameState: self.gameState
+        )
+        
+        print("🎮 Bot initialized. Waiting for /start command...")
         
         await self.runGameLoop()
     }
                 
     private func runGameLoop() async {
-        print("🎮 Game automation active. Listening for messages...")
+        print("🎮 Game automation ready. Send /start to begin.")
+        
+        guard let client = self.client else {
+            print("❌ No client available for game loop")
+            return
+        }
         
         while true {
             do {
-                try await Task.sleep(seconds: 30)
-                print("🤖 Bot is running... Ping - Pong 🫡")
+                // Only process if bot is running
+                if await gameState.isRunning() {
+                    // Initial status check if just started
+                    let currentState = await gameState.playState
+                    if currentState == .idle {
+                        await OstromagBot.sendStaticInlineButton(client: client, chatId: ostromagId, text: "🧍 Персонаж")
+                        try? await Task.sleep(seconds: 3) // Wait for response
+                        
+                        // Report initial status
+                        await OstromagBot.reportActionWithLevel(
+                            GameAction.initialStatus(), 
+                            client: client, 
+                            gameState: self.gameState
+                        )
+                        
+                        // Set to exploring state
+                        _ = await gameState.setPlayState(.exploring)
+                    }
+                    
+                    // Check if waiting for energy
+                    if let seconds = await gameState.secondsUntilEnergy() {
+                        print("⏳ Waiting \(seconds) seconds for energy...")
+                        try await Task.sleep(seconds: UInt64(min(seconds + 5, 300)))
+                        
+                        // Check status after waiting
+                        await OstromagBot.sendStaticInlineButton(client: client, chatId: ostromagId, text: "🧍 Персонаж")
+                        try? await Task.sleep(seconds: 2)
+                        
+                        // Report energy restored if we can explore now
+                        if await gameState.canExplore() {
+                            await OstromagBot.reportActionWithLevel(
+                                GameAction.energyRestored(), 
+                                client: client, 
+                                gameState: self.gameState
+                            )
+                        }
+                        continue
+                    }
+                    
+                    // If ready to explore, send command
+                    if await gameState.canExplore() {
+                        print("🗺️ Sending explore command...")
+                        await OstromagBot.sendStaticInlineButton(client: client, chatId: ostromagId, text: "🗺️ Досліджувати (⚡1)")
+                    }
+                    
+                    // Wait before next check
+                    try await Task.sleep(seconds: 30)
+                } else {
+                    // Bot is stopped, wait longer
+                    try await Task.sleep(seconds: 60)
+                }
+                
             } catch {
                 print("❌ Error in game loop: \(error)")
+                try? await Task.sleep(seconds: 10)
             }
         }
     }
