@@ -42,3 +42,4 @@ class Config:
     
     # Debug
     DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
+    VERBOSE_LOGGING = os.getenv('VERBOSE_LOGGING', 'True').lower() == 'true'  # Detailed bot logging
