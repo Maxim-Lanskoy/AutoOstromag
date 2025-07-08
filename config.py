@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+
 class Config:
     """Bot configuration"""
     
@@ -38,3 +39,7 @@ class Config:
     # Delays
     BUTTON_CLICK_DELAY = 1.0  # Delay after clicking buttons
     MESSAGE_READ_DELAY = 0.5  # Delay for reading messages
+    
+    # Debug
+    DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
+    VERBOSE_LOGGING = os.getenv('VERBOSE_LOGGING', 'True').lower() == 'true'  # Detailed bot logging
