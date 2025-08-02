@@ -52,8 +52,8 @@ class GameBot:
         self.energy_regen_time = None
         
         # Battle escape thresholds
-        self.LOW_HP_THRESHOLD = 80
-        self.CRITICAL_HP_THRESHOLD = 50
+        self.LOW_HP_THRESHOLD = 10
+        self.CRITICAL_HP_THRESHOLD = 5
         
         # Debug logging flag
         self.DEBUG_LOGGING = getattr(config, 'VERBOSE_LOGGING', True)
