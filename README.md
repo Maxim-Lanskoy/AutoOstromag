@@ -179,8 +179,6 @@ python buying_bot.py --item "Other Item"      # Buy different item type
 
 **Flow:** /start → 🏘️ Town → 🏪 Shop → Buy Items → Select Item → Click Buy repeatedly → /start → Exit
 
----
-
 ### **Disassembly Bot** (`disassembly_bot.py`)  
 Automated crafting materials bot that disassembles items into useful resources.
 
@@ -200,10 +198,8 @@ python disassembly_bot.py --item "Other Item" # Disassemble different item type
 
 **Flow:** /start → 🎒 Inventory → ⚔️ Equipment → ⬅️ Last Page → Find Items → Dismantle → Confirm → Repeat → /start → Exit
 
----
-
 ### **Combined Workflow**
 Perfect for resource management and crafting material generation:
 
-1. **Buy resources**: `python buying_bot.py --quantity 100` 
+1. **Buy resources**: `python buying_bot.py` 
 2. **Convert to materials**: `python disassembly_bot.py`
