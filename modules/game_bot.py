@@ -177,7 +177,7 @@ class GameBot:
     async def wait_for_full_hp(self):
         """Wait for HP to fully regenerate with manual healing detection"""
         if self.hp_regen_minutes:
-            wait_seconds = (self.hp_regen_minutes * 60) + 30  # Add 30s buffer
+            wait_seconds = ((self.hp_regen_minutes - 1) * 60) + 30  # Add 30s buffer
             logger.info(f"Waiting {self.hp_regen_minutes} minutes for full HP...")
             
             # Check for manual healing every 30 seconds
