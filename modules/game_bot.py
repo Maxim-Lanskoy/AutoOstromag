@@ -16,6 +16,7 @@ from telethon.tl.custom import Message
 
 from utils.logger import setup_logger
 from utils.parser import GameParser
+from utils.energy_tracker import EnergyTracker
 
 logger = setup_logger(__name__)
 
@@ -46,6 +47,9 @@ class GameBot:
         # Regeneration times from game
         self.hp_regen_minutes = None
         self.energy_regen_minutes = None
+        
+        # Energy tracker for daily limits and time windows
+        self.energy_tracker = EnergyTracker(config.DAILY_ENERGY_LIMIT, config.EXPLORATION_START_HOUR)
     
     async def human_delay(self, min_seconds=None, max_seconds=None):
         """Simulate human-like reaction time"""
@@ -443,8 +447,56 @@ class GameBot:
                     await self.wait_for_energy()
                     continue
                 
+                # 🚫 Check exploration restrictions (time window + energy limit)
+                if not self.energy_tracker.can_explore_now():
+                    # Check what's preventing exploration
+                    if not self.energy_tracker.is_in_exploration_window():
+                        time_until_window = self.energy_tracker.get_time_until_exploration_window()
+                        start_hour = self.energy_tracker.exploration_start_hour
+                        logger.warning(f"Outside exploration window (starts at {start_hour:02d}:00)! "
+                                     f"Waiting {time_until_window} until exploration time")
+                        
+                        # Wait until exploration window opens (check every 10 minutes)
+                        while not self.energy_tracker.is_in_exploration_window():
+                            await asyncio.sleep(600)  # 10 minutes
+                            time_remaining = self.energy_tracker.get_time_until_exploration_window()
+                            logger.info(f"Still waiting for exploration window... {time_remaining} remaining")
+                        
+                        logger.info(f"Exploration window opened! ({start_hour:02d}:00 - 12:00)")
+                        continue
+                    
+                    elif not self.energy_tracker.can_use_energy():
+                        remaining_energy = self.energy_tracker.get_remaining_energy()
+                        time_until_reset = self.energy_tracker.get_time_until_reset()
+                        logger.warning(f"Daily energy limit reached ({self.energy_tracker.daily_limit})! "
+                                     f"Waiting {time_until_reset} until reset at 12:00")
+                        
+                        # Wait until energy resets (check every 5 minutes)
+                        while not self.energy_tracker.can_use_energy():
+                            await asyncio.sleep(300)  # 5 minutes
+                            logger.info(f"Still waiting for energy reset... {self.energy_tracker.get_time_until_reset()} remaining")
+                        
+                        logger.info("Daily energy limit reset! Now waiting for exploration window...")
+                        
+                        # After reset, check if we need to wait for exploration window
+                        if not self.energy_tracker.is_in_exploration_window():
+                            time_until_window = self.energy_tracker.get_time_until_exploration_window()
+                            start_hour = self.energy_tracker.exploration_start_hour
+                            logger.info(f"Waiting {time_until_window} until exploration window opens at {start_hour:02d}:00")
+                            
+                            while not self.energy_tracker.is_in_exploration_window():
+                                await asyncio.sleep(600)  # 10 minutes
+                                time_remaining = self.energy_tracker.get_time_until_exploration_window()
+                                logger.info(f"Still waiting for exploration window... {time_remaining} remaining")
+                        
+                        logger.info("Ready to explore!")
+                        continue
+                
                 # 🗺️ Explore
                 await self.explore()
+                
+                # Track energy usage
+                self.energy_tracker.use_energy(1)
                 
                 # Check response
                 messages = await self.client.get_messages(self.game_chat, limit=2)

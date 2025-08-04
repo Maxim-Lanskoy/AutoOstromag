@@ -26,6 +26,12 @@ class Config:
     # Debug
     DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
     
+    # Daily energy limit (0 = unlimited)
+    DAILY_ENERGY_LIMIT = int(os.getenv('DAILY_ENERGY_LIMIT', '0'))
+    
+    # Exploration time window (-1 = always explore, 0-23 = start hour)
+    EXPLORATION_START_HOUR = int(os.getenv('EXPLORATION_START_HOUR', '-1'))
+    
     # Escape configuration - mobs to immediately run away from
     ESCAPE_MOBS = [
         "Великий Дикий Тур",

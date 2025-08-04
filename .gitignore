@@ -38,3 +38,6 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.temp
+
+# Energy persistent store file
+energy_data.json

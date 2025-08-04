@@ -31,6 +31,8 @@ The bot follows a **simple, linear flow**:
 - **💉 Manual healing detection** during HP wait (checks every 30s)
 - **📊 Enhanced logging** with battle separators and mob names
 - **⏱️ Optimized timers** no extra waiting when HP timer expires
+- **📉 Daily energy limits** with 12:00 reset and persistence
+- **🌙 Exploration time windows** for overnight/scheduled automation
 - **🔄 Retry mechanism** for failed profile checks
 - **⏰ Real regeneration times** from game
 - **🏕️ Camp & trap detection** for maximum opportunities
@@ -38,7 +40,7 @@ The bot follows a **simple, linear flow**:
 
 ## ⚙️ Configuration
 
-Only **6 essential settings** in `.env`:
+Only **8 essential settings** in `.env`:
 
 ```bash
 # Telegram API credentials
@@ -55,6 +57,12 @@ HUMAN_DELAY_MAX=3.0
 
 # Debug mode
 DEBUG=False
+
+# Daily energy limit (0 = unlimited)
+DAILY_ENERGY_LIMIT=0
+
+# Exploration time window (-1 = always explore, 0-23 = start hour)
+EXPLORATION_START_HOUR=-1
 ```
 
 ### 🏃 Escape Mobs Configuration
@@ -76,6 +84,28 @@ You can customize this list based on your character's strength. The bot will:
 - Immediately attempt to escape when encountering these mobs
 - Retry escape up to 5 times if it fails
 - Only fight if all escape attempts are exhausted
+
+### ⚡ Daily Energy Limit & Time Windows
+
+Control when and how much the bot explores:
+
+**Energy Limits (`DAILY_ENERGY_LIMIT`)**:
+- `0` = unlimited (default)
+- `10` = max 10 explorations per day
+- Resets daily at 12:00 (noon)
+- Tracks usage in `energy_data.json`
+
+**Time Windows (`EXPLORATION_START_HOUR`)**:
+- `-1` = always explore (default)
+- `23` = only explore 23:00-12:00 (overnight)
+- `6` = only explore 06:00-12:00 (morning)
+- Handles midnight crossover correctly
+
+**Combined Logic**:
+1. Bot waits for exploration window to open
+2. Uses energy within daily limit
+3. When limit reached, waits for 12:00 reset
+4. After reset, waits for next exploration window
 
 ## 🛠️ Installation & Setup
 
