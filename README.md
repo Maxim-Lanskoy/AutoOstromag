@@ -151,6 +151,7 @@ AutoOstromag/
 │   └── parser.py             # Basic message parsing
 │
 ├── buying_bot.py            # Specialized bot for purchasing items from shop
+├── disassembly_bot.py       # Specialized bot for disassembling items into materials
 ├── Swift/                    # (Kept as requested)
 ├── ostromag_bot.py          # (Kept for other purposes)
 └── REMOVED_FEATURES.md       # Documentation of what was removed
@@ -177,6 +178,32 @@ python buying_bot.py --item "Other Item"      # Buy different item type
 ```
 
 **Flow:** /start → 🏘️ Town → 🏪 Shop → Buy Items → Select Item → Click Buy repeatedly → /start → Exit
+
+---
+
+### **Disassembly Bot** (`disassembly_bot.py`)  
+Automated crafting materials bot that disassembles items into useful resources.
+
+**Features:**
+- ⚡ **Lightning-fast processing** - ~3-4 seconds per item  
+- 🎯 **Smart inventory navigation** - /start → Inventory → Equipment → Last Page → Find Items
+- 🔄 **Continuous disassembly** - Processes all items automatically until none remain
+- 🚀 **Fire-and-forget clicking** - No API delays, instant confirmation clicking
+- 🔧 **Auto-confirmation** - Handles "Так/Ні" dialogs instantly without waiting  
+- 📊 **Progress tracking** - Shows total items disassembled
+
+**Usage:**
+```bash
+python disassembly_bot.py                     # Disassemble all leather boots (default)  
+python disassembly_bot.py --item "Other Item" # Disassemble different item type
+```
+
+**Flow:** /start → 🎒 Inventory → ⚔️ Equipment → ⬅️ Last Page → Find Items → Dismantle → Confirm → Repeat → /start → Exit
+
+---
+
 ### **Combined Workflow**
 Perfect for resource management and crafting material generation:
 
+1. **Buy resources**: `python buying_bot.py --quantity 100` 
+2. **Convert to materials**: `python disassembly_bot.py`
