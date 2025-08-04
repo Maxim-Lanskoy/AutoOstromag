@@ -71,14 +71,7 @@ class GameBot:
             await self.client.send_message(self.game_chat, '/start')
             await asyncio.sleep(3)
             
-            # Check initial character status
-            await self.check_character_status()
-            
-            # Wait for full HP if needed
-            if self.current_hp < self.max_hp:
-                await self.wait_for_full_hp()
-            
-            # Start main loop
+            # Start main loop (it will handle profile check and HP wait)
             self.is_running = True
             await self.main_loop()
             
@@ -178,11 +171,43 @@ class GameBot:
                 raise
     
     async def wait_for_full_hp(self):
-        """Wait for HP to fully regenerate"""
+        """Wait for HP to fully regenerate with manual healing detection"""
         if self.hp_regen_minutes:
             wait_seconds = (self.hp_regen_minutes * 60) + 30  # Add 30s buffer
             logger.info(f"Waiting {self.hp_regen_minutes} minutes for full HP...")
-            await asyncio.sleep(wait_seconds)
+            
+            # Check for manual healing every 30 seconds
+            check_interval = 30
+            elapsed = 0
+            
+            while elapsed < wait_seconds:
+                # Calculate time to wait this iteration
+                time_to_wait = min(check_interval, wait_seconds - elapsed)
+                if time_to_wait <= 0:
+                    break
+                    
+                await asyncio.sleep(time_to_wait)
+                elapsed += time_to_wait
+                
+                # Check recent messages for profile updates
+                messages = await self.client.get_messages(self.game_chat, limit=3)
+                for msg in messages:
+                    if msg.text and "Здоров'я:" in msg.text and "Енергія:" in msg.text:
+                        # Parse HP from profile message
+                        hp_match = re.search(r'Здоров\'я: (\d+)/(\d+)', msg.text)
+                        if hp_match:
+                            current_hp = int(hp_match.group(1))
+                            max_hp = int(hp_match.group(2))
+                            if current_hp >= max_hp:
+                                logger.info("Manual healing detected! HP is now full!")
+                                self.current_hp = current_hp
+                                self.max_hp = max_hp
+                                return
+                
+                # Show progress
+                remaining = max(0, wait_seconds - elapsed)
+                if remaining > 0 and elapsed % 60 == 0:  # Log every minute
+                    logger.info(f"Still waiting for HP... {remaining // 60} minutes remaining")
         else:
             # Check every minute until full
             logger.info("Waiting for full HP (checking every minute)...")
@@ -215,15 +240,45 @@ class GameBot:
         """Handle battle with simple logic"""
         battle_ended = False
         rounds = 0
+        should_escape = False
+        escape_attempts = 0
+        max_escape_attempts = 5
+        mob_name = "Unknown"
         
         logger.info("Battle started!")
+        
+        # Check if we should escape from this mob and extract mob name
+        messages = await self.client.get_messages(self.game_chat, limit=2)
+        for msg in messages:
+            if msg.text and "З'явився" in msg.text:
+                # Extract mob name from message
+                mob_match = re.search(r'З\'явився (.+?)!', msg.text)
+                if mob_match:
+                    mob_name = mob_match.group(1)
+                
+                for escape_mob in self.config.ESCAPE_MOBS:
+                    if escape_mob in msg.text:
+                        should_escape = True
+                        logger.warning(f"Encountered escape mob: {escape_mob} - will attempt to run away!")
+                        break
+                break
+        
+        if should_escape:
+            logger.info(f"Trying to escape from: {mob_name}")
+        else:
+            logger.info(f"Fighting against: {mob_name}")
         
         while not battle_ended and rounds < 30:
             rounds += 1
             await asyncio.sleep(3)
             
+            # If we've exceeded max escape attempts for an escape mob, fight normally
+            if should_escape and escape_attempts >= max_escape_attempts:
+                logger.warning(f"Max escape attempts ({max_escape_attempts}) exceeded, will fight normally")
+                should_escape = False
+            
             # Get latest messages
-            messages = await self.client.get_messages(self.game_chat, limit=5)
+            messages = await self.client.get_messages(self.game_chat, limit=2)
             
             for msg in messages:
                 if not msg.text:
@@ -235,7 +290,7 @@ class GameBot:
                     battle_ended = True
                     break
                 elif "Ви зазнали поразки!" in msg.text:
-                    logger.warning("Battle lost!")
+                    logger.warning(f"Battle lost against {mob_name}!")
                     battle_ended = True
                     break
                 elif "Ви не перебуваєте в бою" in msg.text:
@@ -250,6 +305,14 @@ class GameBot:
                     logger.info("Successfully escaped!")
                     battle_ended = True
                     break
+                elif "Втеча не вдалася!" in msg.text:
+                    escape_attempts += 1
+                    if escape_attempts < max_escape_attempts:
+                        logger.warning(f"Escape failed! Will try again... (attempt {escape_attempts}/{max_escape_attempts})")
+                    else:
+                        logger.warning(f"Escape failed! Max attempts reached ({escape_attempts}/{max_escape_attempts})")
+                        should_escape = False
+                    continue
                 
                 # Handle battle actions
                 if msg.buttons and not battle_ended:
@@ -263,6 +326,7 @@ class GameBot:
                     has_attack = False
                     has_skills = False
                     has_potions = False
+                    has_escape = False
                     
                     for row_idx, row in enumerate(msg.buttons):
                         for btn_idx, btn in enumerate(row):
@@ -273,13 +337,28 @@ class GameBot:
                                     has_skills = True
                                 elif "Зілля" in btn.text:
                                     has_potions = True
+                                elif "Втеча" in btn.text:
+                                    has_escape = True
                     
                     # If this is a battle message with actions
-                    if has_attack:
+                    if has_attack or has_escape:
                         clicked = False
                         
-                        # Use potion if HP < 100
-                        if has_potions and current_hp and current_hp < 100:
+                        # Priority 1: Try to escape if this is an escape mob and we haven't exceeded max attempts
+                        if should_escape and has_escape and escape_attempts < max_escape_attempts:
+                            for row_idx, row in enumerate(msg.buttons):
+                                for btn_idx, btn in enumerate(row):
+                                    if btn.text and "Втеча" in btn.text:
+                                        await self.human_delay()
+                                        await msg.click(row_idx, btn_idx)
+                                        logger.info(f"Clicking escape button (attempt {escape_attempts + 1}/{max_escape_attempts})")
+                                        clicked = True
+                                        break
+                                if clicked:
+                                    break
+                        
+                        # Priority 2: Use potion if HP < 100 (and we're not escaping)
+                        if has_potions and current_hp and current_hp < 100 and not clicked:
                             for row_idx, row in enumerate(msg.buttons):
                                 for btn_idx, btn in enumerate(row):
                                     if btn.text and "Зілля" in btn.text:
@@ -290,7 +369,7 @@ class GameBot:
                                         
                                         # Wait and select first potion
                                         await asyncio.sleep(3)
-                                        potion_msgs = await self.client.get_messages(self.game_chat, limit=3)
+                                        potion_msgs = await self.client.get_messages(self.game_chat, limit=2)
                                         for pmsg in potion_msgs:
                                             if pmsg.text and "Оберіть зілля" in pmsg.text and pmsg.buttons:
                                                 await self.human_delay()
@@ -301,7 +380,7 @@ class GameBot:
                                 if clicked:
                                     break
                         
-                        # Use skills if available
+                        # Priority 3: Use skills if available
                         elif has_skills and not clicked:
                             for row_idx, row in enumerate(msg.buttons):
                                 for btn_idx, btn in enumerate(row):
@@ -313,7 +392,7 @@ class GameBot:
                                         
                                         # Wait and select first skill
                                         await asyncio.sleep(3)
-                                        skill_msgs = await self.client.get_messages(self.game_chat, limit=3)
+                                        skill_msgs = await self.client.get_messages(self.game_chat, limit=2)
                                         for smsg in skill_msgs:
                                             if smsg.text and "Оберіть прийом" in smsg.text and smsg.buttons:
                                                 await self.human_delay()
@@ -324,7 +403,7 @@ class GameBot:
                                 if clicked:
                                     break
                         
-                        # Otherwise attack
+                        # Priority 4: Otherwise attack
                         if not clicked:
                             for row_idx, row in enumerate(msg.buttons):
                                 for btn_idx, btn in enumerate(row):
@@ -339,7 +418,8 @@ class GameBot:
                         
                         break  # Only process one battle message
         
-        logger.info(f"Battle ended after {rounds} rounds")
+        if should_escape:
+            logger.info(f"Battle ended after {rounds} rounds")
         await asyncio.sleep(3)
     
     async def main_loop(self):
@@ -348,6 +428,8 @@ class GameBot:
         
         while self.is_running:
             try:
+                logger.info("=" * 50)  # Separator for new exploration cycle
+                
                 # 🧍 Check character status
                 await self.check_character_status()
                 
@@ -365,7 +447,7 @@ class GameBot:
                 await self.explore()
                 
                 # Check response
-                messages = await self.client.get_messages(self.game_chat, limit=5)
+                messages = await self.client.get_messages(self.game_chat, limit=2)
                 
                 battle_started = False
                 camp_found = False

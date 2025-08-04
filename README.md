@@ -18,19 +18,25 @@ The bot follows a **simple, linear flow**:
 6. **After battle** - check profile and wait for regeneration
 7. **Repeat indefinitely**
 
-### 🥊 Battle Strategy (Simple & Effective)
-- **Use potions** if HP < 100 (survival priority)
-- **Use skills** if available (damage boost)
-- **Otherwise attack** (basic combat)
-- **Force exit** if "Ви не перебуваєте в бою" detected
+### 🥊 Battle Strategy
+- **🏃 Auto-escape** from powerful mobs (configurable list)
+- **🔁 Retry escape** up to 5 times if escape fails
+- **💊 Use potions** if HP < 100 (survival priority)
+- **⚔️ Use skills** if available (damage boost)
+- **👊 Otherwise attack** (basic combat)
+- **📝 Detailed defeat logs** show which mob defeated you
 
 ### 🔄 Smart Features
-- **Retry mechanism** for failed profile checks (handles "don't rush" messages)
-- **Real regeneration times** from game (no more guessing)
-- **Camp detection** for maximum exploration opportunities
-- **Human-like delays** to avoid detection
+- **🏃 Escape system** for dangerous mobs with automatic retry
+- **💉 Manual healing detection** during HP wait (checks every 30s)
+- **📊 Enhanced logging** with battle separators and mob names
+- **⏱️ Optimized timers** no extra waiting when HP timer expires
+- **🔄 Retry mechanism** for failed profile checks
+- **⏰ Real regeneration times** from game
+- **🏕️ Camp & trap detection** for maximum opportunities
+- **🤖 Human-like delays** to avoid detection
 
-## ⚙️ Configuration (Minimal)
+## ⚙️ Configuration
 
 Only **6 essential settings** in `.env`:
 
@@ -50,6 +56,26 @@ HUMAN_DELAY_MAX=3.0
 # Debug mode
 DEBUG=False
 ```
+
+### 🏃 Escape Mobs Configuration
+
+The bot automatically escapes from dangerous mobs defined in `config.py`:
+
+```python
+ESCAPE_MOBS = [
+    "Великий Дикий Тур",
+    "Кусак Лютого Жала", 
+    "Тінь Блукача",
+    "Тіньовий Яструб",
+    "Давній Павук-Могильник",
+    "Старший Дрантогор"
+]
+```
+
+You can customize this list based on your character's strength. The bot will:
+- Immediately attempt to escape when encountering these mobs
+- Retry escape up to 5 times if it fails
+- Only fight if all escape attempts are exhausted
 
 ## 🛠️ Installation & Setup
 

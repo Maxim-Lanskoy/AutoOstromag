@@ -25,3 +25,13 @@ class Config:
     
     # Debug
     DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
+    
+    # Escape configuration - mobs to immediately run away from
+    ESCAPE_MOBS = [
+        "Великий Дикий Тур",
+        "Кусак Лютого Жала",
+        "Тінь Блукача",
+        "Тіньовий Яструб",
+        "Давній Павук-Могильник",
+        "Старший Дрантогор"
+    ]
