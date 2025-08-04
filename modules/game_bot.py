@@ -96,7 +96,7 @@ class GameBot:
             await self.client.send_message(self.game_chat, "🧍 Персонаж")
             await asyncio.sleep(3)
             
-            messages = await self.client.get_messages(self.game_chat, limit=5)
+            messages = await self.client.get_messages(self.game_chat, limit=2)
             
             # Check for "don't rush" message indicating we need to wait
             for msg in messages:
