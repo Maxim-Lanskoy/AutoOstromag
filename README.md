@@ -150,7 +150,33 @@ AutoOstromag/
 │   ├── logger.py             # Simple logging
 │   └── parser.py             # Basic message parsing
 │
+├── buying_bot.py            # Specialized bot for purchasing items from shop
 ├── Swift/                    # (Kept as requested)
 ├── ostromag_bot.py          # (Kept for other purposes)
 └── REMOVED_FEATURES.md       # Documentation of what was removed
 ```
+
+## 🛒 Specialized Utility Bots
+
+### **Buying Bot** (`buying_bot.py`)
+Automated resource purchasing bot that efficiently buys items from the game shop.
+
+**Features:**
+- 🚀 **Ultra-fast purchasing** - ~3-4 seconds per item
+- 🎯 **Smart navigation** - Direct path: /start → Town → Shop → Buy Items → Select → Purchase
+- 🔄 **Continuous buying** - Stays on same message, clicks buy button repeatedly  
+- 💰 **Configurable quantity** - Set how many items to buy (default: 100)
+- 🛡️ **Reliable operation** - No message reference issues, works for unlimited purchases
+- 📊 **Progress tracking** - Shows purchase count and remaining gold
+
+**Usage:**
+```bash
+python buying_bot.py                           # Buy 100 leather boots (default)
+python buying_bot.py --quantity 50            # Buy 50 items
+python buying_bot.py --item "Other Item"      # Buy different item type
+```
+
+**Flow:** /start → 🏘️ Town → 🏪 Shop → Buy Items → Select Item → Click Buy repeatedly → /start → Exit
+### **Combined Workflow**
+Perfect for resource management and crafting material generation:
+
