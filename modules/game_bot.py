@@ -310,12 +310,12 @@ class GameBot:
                     battle_ended = True
                     break
                 elif "Втеча не вдалася!" in msg.text:
-                    escape_attempts += 1
-                    if escape_attempts < max_escape_attempts:
-                        logger.warning(f"Escape failed! Will try again... (attempt {escape_attempts}/{max_escape_attempts})")
-                    else:
-                        logger.warning(f"Escape failed! Max attempts reached ({escape_attempts}/{max_escape_attempts})")
-                        should_escape = False
+                    if should_escape:  # Only process if we're still trying to escape
+                        if escape_attempts < max_escape_attempts:
+                            logger.warning(f"Escape failed! Will try again... (attempt {escape_attempts}/{max_escape_attempts})")
+                        else:
+                            logger.warning(f"Escape failed! Max attempts reached ({escape_attempts}/{max_escape_attempts})")
+                            should_escape = False
                     continue
                 
                 # Handle battle actions
@@ -353,9 +353,10 @@ class GameBot:
                             for row_idx, row in enumerate(msg.buttons):
                                 for btn_idx, btn in enumerate(row):
                                     if btn.text and "Втеча" in btn.text:
+                                        escape_attempts += 1  # Increment before clicking
                                         await self.human_delay()
                                         await msg.click(row_idx, btn_idx)
-                                        logger.info(f"Clicking escape button (attempt {escape_attempts + 1}/{max_escape_attempts})")
+                                        logger.info(f"Clicking escape button (attempt {escape_attempts}/{max_escape_attempts})")
                                         clicked = True
                                         break
                                 if clicked:
