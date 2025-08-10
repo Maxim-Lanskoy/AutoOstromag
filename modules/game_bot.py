@@ -395,14 +395,25 @@ class GameBot:
                                         logger.info("Clicked skills button")
                                         clicked = True
                                         
-                                        # Wait and select first skill
+                                        # Wait and select last skill (button before the "back" button)
                                         await asyncio.sleep(3)
                                         skill_msgs = await self.client.get_messages(self.game_chat, limit=2)
                                         for smsg in skill_msgs:
                                             if smsg.text and "Оберіть прийом" in smsg.text and smsg.buttons:
-                                                await self.human_delay()
-                                                await smsg.click(0, 0)
-                                                logger.info("Selected first skill")
+                                                # Skills are placed vertically, last button is "back"
+                                                # So we need to click the button before the last one
+                                                num_buttons = len(smsg.buttons)
+                                                if num_buttons >= 2:
+                                                    # Click the second-to-last button (last skill)
+                                                    skill_index = num_buttons - 2
+                                                    await self.human_delay()
+                                                    await smsg.click(skill_index, 0)
+                                                    logger.info(f"Selected last skill (button {skill_index})")
+                                                else:
+                                                    # Fallback: if only 1 button, click it
+                                                    await self.human_delay()
+                                                    await smsg.click(0, 0)
+                                                    logger.info("Selected only available skill")
                                                 break
                                         break
                                 if clicked:
