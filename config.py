@@ -32,6 +32,9 @@ class Config:
     # Exploration time window (-1 = always explore, 0-23 = start hour)
     EXPLORATION_START_HOUR = int(os.getenv('EXPLORATION_START_HOUR', '-1'))
     
+    # Human-like behavior level (0-5, where 0 is disabled and 5 is maximum human-like)
+    HUMAN_LIKE = int(os.getenv('HUMAN_LIKE', '0'))
+    
     # Escape configuration - mobs to immediately run away from
     ESCAPE_MOBS = [
         "Великий Дикий Тур",

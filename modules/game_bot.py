@@ -10,6 +10,7 @@ Main flow:
 
 import asyncio
 import re
+import random
 from datetime import datetime, timedelta
 from telethon import events, Button
 from telethon.tl.custom import Message
@@ -50,15 +51,48 @@ class GameBot:
         
         # Energy tracker for daily limits and time windows
         self.energy_tracker = EnergyTracker(config.DAILY_ENERGY_LIMIT, config.EXPLORATION_START_HOUR)
+        
+        # Human-like behavior tracking
+        self.battle_session_count = 0  # Track consecutive battles in current session
+        self.last_activity_time = None  # Track last exploration/battle time
+        self.energy_full_timestamp = None  # Track when energy became full
+        self.session_battles_target = 0  # Random target for battles in current session
+        self.waiting_for_full_energy = False  # Whether we're waiting for full energy
+        self.session_start_time = None  # Track when current session started (for fatigue)
+        self.total_battles_today = 0  # Track total battles for fatigue simulation
     
     async def human_delay(self, min_seconds=None, max_seconds=None):
-        """Simulate human-like reaction time"""
-        import random
+        """Simulate human-like reaction time with scaling based on HUMAN_LIKE level"""
+        if self.config.HUMAN_LIKE == 0:
+            return  # No delay at level 0
+        
         if min_seconds is None:
             min_seconds = self.config.HUMAN_DELAY_MIN
         if max_seconds is None:
             max_seconds = self.config.HUMAN_DELAY_MAX
-        delay = random.uniform(min_seconds, max_seconds)
+        
+        # Scale delays based on human-like level
+        level_multipliers = {
+            1: 0.3,   # 30% of configured delays
+            2: 0.6,   # 60% of configured delays
+            3: 1.0,   # 100% of configured delays
+            4: 1.5,   # 150% of configured delays
+            5: 2.5    # 250% of configured delays
+        }
+        
+        multiplier = level_multipliers.get(self.config.HUMAN_LIKE, 1.0)
+        
+        # Apply fatigue factor at levels 3+ (slower reactions after playing for a while)
+        fatigue_multiplier = 1.0
+        if self.config.HUMAN_LIKE >= 3 and self.session_start_time:
+            session_duration = (datetime.now() - self.session_start_time).total_seconds() / 3600  # hours
+            if session_duration > 1:  # After 1 hour
+                # Gradually increase delays up to 50% at level 3, 75% at level 4, 100% at level 5
+                max_fatigue = {3: 0.5, 4: 0.75, 5: 1.0}.get(self.config.HUMAN_LIKE, 0.5)
+                fatigue_multiplier = 1 + (min(session_duration - 1, 2) / 2) * max_fatigue
+        
+        delay = random.uniform(min_seconds * multiplier * fatigue_multiplier, 
+                              max_seconds * multiplier * fatigue_multiplier)
         await asyncio.sleep(delay)
     
     async def start(self):
@@ -241,7 +275,7 @@ class GameBot:
         await asyncio.sleep(3)
     
     async def handle_battle(self):
-        """Handle battle with simple logic"""
+        """Handle battle with simple logic and human-like delays"""
         battle_ended = False
         rounds = 0
         should_escape = False
@@ -250,6 +284,12 @@ class GameBot:
         mob_name = "Unknown"
         
         logger.info("Battle started!")
+        
+        # Add reaction delay for human-like behavior
+        if self.config.HUMAN_LIKE > 0:
+            # Longer initial reaction when battle starts
+            reaction_delay = await self.get_human_like_pause("message_reading")
+            await asyncio.sleep(reaction_delay)
         
         # Check if we should escape from this mob and extract mob name
         messages = await self.client.get_messages(self.game_chat, limit=2)
@@ -438,9 +478,128 @@ class GameBot:
             logger.info(f"Battle ended after {rounds} rounds")
         await asyncio.sleep(3)
     
+    async def get_human_like_pause(self, pause_type="between_battles"):
+        """Get random pause duration based on context and human-like level"""
+        level = self.config.HUMAN_LIKE
+        if level == 0:
+            return 0  # No delays
+        
+        # Base delays that scale with level
+        delay_multipliers = {
+            0: 0,
+            1: 0.1,   # 10% of base delays
+            2: 0.3,   # 30% of base delays
+            3: 1.0,   # 100% of base delays (original values)
+            4: 2.0,   # 200% of base delays
+            5: 5.0    # 500% of base delays
+        }
+        
+        multiplier = delay_multipliers.get(level, 1.0)
+        
+        if pause_type == "between_battles":
+            # Short pause between consecutive battles in a session
+            base_min, base_max = 30, 120  # 30 seconds to 2 minutes
+            return random.uniform(base_min * multiplier, base_max * multiplier)
+        elif pause_type == "session_break":
+            # Longer break after completing a battle session
+            base_min, base_max = 900, 2700  # 15 to 45 minutes
+            return random.uniform(base_min * multiplier, base_max * multiplier)
+        elif pause_type == "before_energy_use":
+            # Pause before using newly available energy
+            base_min, base_max = 120, 600  # 2 to 10 minutes
+            return random.uniform(base_min * multiplier, base_max * multiplier)
+        elif pause_type == "waiting_for_full":
+            # Additional wait when deciding to wait for full energy
+            base_min, base_max = 300, 900  # 5 to 15 minutes
+            return random.uniform(base_min * multiplier, base_max * multiplier)
+        elif pause_type == "message_reading":
+            # Time to "read" a message based on length
+            base_min, base_max = 0.5, 2  # 0.5 to 2 seconds base
+            return random.uniform(base_min * multiplier, base_max * multiplier)
+        else:
+            base_min, base_max = 60, 180  # Default 1-3 minutes
+            return random.uniform(base_min * multiplier, base_max * multiplier)
+    
+    async def should_wait_for_full_energy(self):
+        """Decide if we should wait for full energy (human-like decision)"""
+        level = self.config.HUMAN_LIKE
+        if level == 0:
+            return False
+        
+        # Chance to wait for full energy scales with level
+        wait_chances = {
+            1: 0.05,  # 5% chance
+            2: 0.15,  # 15% chance
+            3: 0.30,  # 30% chance
+            4: 0.45,  # 45% chance
+            5: 0.60   # 60% chance
+        }
+        
+        chance = wait_chances.get(level, 0.3)
+        
+        # Higher chance to wait if we have less than max energy
+        if self.current_energy < self.max_energy:
+            return random.random() < chance
+        return False
+    
+    async def is_in_working_hours(self):
+        """Check if we're in the configured working time window"""
+        if self.config.EXPLORATION_START_HOUR == -1:
+            return False  # No time window configured
+        
+        current_hour = datetime.now().hour
+        start_hour = self.config.EXPLORATION_START_HOUR
+        end_hour = 12  # Always ends at noon
+        
+        if start_hour > end_hour:
+            # Handles midnight crossover (e.g., 23:00 - 12:00)
+            return current_hour >= start_hour or current_hour < end_hour
+        else:
+            # Normal time range (e.g., 6:00 - 12:00)
+            return start_hour <= current_hour < end_hour
+    
+    async def get_message_reading_delay(self, text):
+        """Calculate delay for 'reading' a message based on its length"""
+        if self.config.HUMAN_LIKE == 0 or not text:
+            return 0
+        
+        # Estimate word count (rough approximation)
+        word_count = len(text.split())
+        
+        # Base reading speed: 200-300 words per minute (3-5 words per second)
+        # Scales with human-like level
+        base_time = word_count / 4  # Base ~250 wpm
+        
+        level_multipliers = {
+            1: 0.2,   # Very fast reading
+            2: 0.5,   # Fast reading
+            3: 1.0,   # Normal reading speed
+            4: 1.5,   # Careful reading
+            5: 2.0    # Very careful reading
+        }
+        
+        multiplier = level_multipliers.get(self.config.HUMAN_LIKE, 1.0)
+        reading_time = base_time * multiplier
+        
+        # Add some randomness (±20%)
+        reading_time *= random.uniform(0.8, 1.2)
+        
+        # Cap between 0.5 and 10 seconds
+        return min(max(reading_time, 0.5), 10)
+    
     async def main_loop(self):
         """Main bot loop"""
         logger.info("=== MAIN LOOP STARTED ===")
+        if self.config.HUMAN_LIKE > 0:
+            level_descriptions = {
+                1: "Minimal - slight randomization",
+                2: "Light - basic patterns",
+                3: "Moderate - realistic patterns",
+                4: "Heavy - very human-like",
+                5: "Maximum - most human-like but inefficient"
+            }
+            desc = level_descriptions.get(self.config.HUMAN_LIKE, "Unknown")
+            logger.info(f"Human-like mode enabled - Level {self.config.HUMAN_LIKE} ({desc})")
         
         while self.is_running:
             try:
@@ -459,8 +618,72 @@ class GameBot:
                     await self.wait_for_energy()
                     continue
                 
+                # 🤖 Human-like: Decide if we should wait for full energy
+                if self.config.HUMAN_LIKE > 0 and not await self.is_in_working_hours():
+                    if self.waiting_for_full_energy or await self.should_wait_for_full_energy():
+                        if self.current_energy < self.max_energy:
+                            if not self.waiting_for_full_energy:
+                                wait_time = await self.get_human_like_pause("waiting_for_full")
+                                logger.info(f"Human-like: Decided to wait for full energy. Waiting {wait_time/60:.1f} minutes...")
+                                self.waiting_for_full_energy = True
+                                await asyncio.sleep(wait_time)
+                                continue
+                            else:
+                                # Continue waiting for full energy
+                                logger.info("Human-like: Still waiting for full energy...")
+                                await asyncio.sleep(60)
+                                continue
+                        else:
+                            # Energy is now full
+                            self.waiting_for_full_energy = False
+                            logger.info("Human-like: Energy is full, proceeding with exploration session")
+                
                 # 🚫 Check exploration restrictions (time window + energy limit)
-                if not self.energy_tracker.can_explore_now():
+                # In human-like mode, ignore restrictions when outside working hours
+                if self.config.HUMAN_LIKE > 0 and not await self.is_in_working_hours():
+                    # Track when energy becomes full
+                    if self.current_energy >= self.max_energy:
+                        if self.energy_full_timestamp is None:
+                            self.energy_full_timestamp = datetime.now()
+                            logger.info("Human-like: Energy is full, tracking timestamp")
+                        else:
+                            # Check if energy has been full for too long
+                            time_since_full = (datetime.now() - self.energy_full_timestamp).total_seconds()
+                            if time_since_full > 1500:  # 25 minutes
+                                logger.warning(f"Human-like: Energy has been full for {time_since_full/60:.1f} minutes! Must use it soon.")
+                                # Force exploration to avoid wasting energy
+                    else:
+                        self.energy_full_timestamp = None
+                    
+                    # Add human-like pause before starting new session
+                    if self.battle_session_count == 0:
+                        # Check if we just finished a session and need a break
+                        if self.last_activity_time:
+                            time_since_last = (datetime.now() - self.last_activity_time).total_seconds()
+                            if time_since_last < 60:  # Just finished a session
+                                pause = await self.get_human_like_pause("session_break")
+                                logger.info(f"Human-like: Taking a break between sessions for {pause/60:.1f} minutes")
+                                await asyncio.sleep(pause)
+                        
+                        # Set new session target (varies by level)
+                        if self.config.HUMAN_LIKE <= 2:
+                            self.session_battles_target = random.randint(5, 8)  # More battles at lower levels
+                        elif self.config.HUMAN_LIKE == 3:
+                            self.session_battles_target = random.randint(3, 5)  # Moderate
+                        else:
+                            self.session_battles_target = random.randint(2, 4)  # Fewer battles at higher levels
+                        
+                        # Mark session start time for fatigue tracking
+                        if not self.session_start_time:
+                            self.session_start_time = datetime.now()
+                        
+                        logger.info(f"Human-like: Starting new session, target: {self.session_battles_target} battles")
+                        
+                        # Small pause before starting
+                        pause = await self.get_human_like_pause("before_energy_use")
+                        logger.info(f"Human-like: Waiting {pause/60:.1f} minutes before starting exploration")
+                        await asyncio.sleep(pause)
+                elif not self.energy_tracker.can_explore_now():
                     # Check what's preventing exploration
                     if not self.energy_tracker.is_in_exploration_window():
                         time_until_window = self.energy_tracker.get_time_until_exploration_window()
@@ -508,7 +731,14 @@ class GameBot:
                 await self.explore()
                 
                 # Track energy usage
-                self.energy_tracker.use_energy(1)
+                if self.config.HUMAN_LIKE == 0 or await self.is_in_working_hours():
+                    # Only track energy limits during working hours
+                    self.energy_tracker.use_energy(1)
+                
+                # Update human-like tracking
+                if self.config.HUMAN_LIKE > 0:
+                    self.last_activity_time = datetime.now()
+                    self.energy_full_timestamp = None  # Reset since we just used energy
                 
                 # Check response
                 messages = await self.client.get_messages(self.game_chat, limit=2)
@@ -518,6 +748,12 @@ class GameBot:
                 
                 for msg in messages:
                     if msg.text:
+                        # Add reading delay for human-like behavior
+                        if self.config.HUMAN_LIKE > 0:
+                            reading_delay = await self.get_message_reading_delay(msg.text)
+                            if reading_delay > 0:
+                                await asyncio.sleep(reading_delay)
+                        
                         # ⚔️ Check if battle started
                         if "З'явився" in msg.text or (msg.buttons and any("Атака" in btn.text for row in msg.buttons for btn in row if btn.text)):
                             battle_started = True
@@ -561,14 +797,35 @@ class GameBot:
                 # ⚔️ Handle battle if started (either from exploration or camp)
                 if battle_started:
                     await self.handle_battle()
+                    if self.config.HUMAN_LIKE > 0:
+                        self.battle_session_count += 1
+                        if self.config.HUMAN_LIKE >= 3:  # Only log at moderate level or higher
+                            logger.info(f"Human-like: Battle {self.battle_session_count}/{self.session_battles_target} in current session")
                 elif camp_found:
                     logger.info("Camp exploration completed")
+                    if self.config.HUMAN_LIKE > 0:
+                        self.battle_session_count += 1  # Camps count as activity
                 
-                # 🕑 Small delay before next iteration (shorter if we found something interesting)
-                if battle_started or camp_found:
-                    await asyncio.sleep(1)  # Quick continuation after action
+                # 🤖 Human-like: Check if we should take a session break
+                if self.config.HUMAN_LIKE > 0 and not await self.is_in_working_hours():
+                    if self.battle_session_count >= self.session_battles_target:
+                        logger.info(f"Human-like: Completed session with {self.battle_session_count} battles")
+                        self.battle_session_count = 0
+                        self.last_activity_time = datetime.now()
+                        # The break will be applied at the start of next loop iteration
+                    elif battle_started or camp_found:
+                        # Add human-like pause between battles in a session
+                        pause = await self.get_human_like_pause("between_battles")
+                        logger.info(f"Human-like: Pausing {pause:.0f} seconds between battles")
+                        await asyncio.sleep(pause)
+                    else:
+                        await asyncio.sleep(2)  # Normal delay when nothing found
                 else:
-                    await asyncio.sleep(2)  # Normal delay
+                    # Normal mode or during working hours - minimal delays
+                    if battle_started or camp_found:
+                        await asyncio.sleep(1)  # Quick continuation after action
+                    else:
+                        await asyncio.sleep(2)  # Normal delay
                 
             except Exception as e:
                 logger.error(f"Error in main loop: {e}")
