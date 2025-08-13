@@ -60,11 +60,13 @@ class GameBot:
         self.waiting_for_full_energy = False  # Whether we're waiting for full energy
         self.session_start_time = None  # Track when current session started (for fatigue)
         self.total_battles_today = 0  # Track total battles for fatigue simulation
+        self.last_mode_was_working = None  # Track mode changes
     
     async def human_delay(self, min_seconds=None, max_seconds=None):
         """Simulate human-like reaction time with scaling based on HUMAN_LIKE level"""
-        if self.config.HUMAN_LIKE == 0:
-            return  # No delay at level 0
+        # Only apply human delays when HUMAN_LIKE > 0 AND we're outside working hours
+        if self.config.HUMAN_LIKE == 0 or await self.is_in_working_hours():
+            return  # No delay in efficient mode or during working hours
         
         if min_seconds is None:
             min_seconds = self.config.HUMAN_DELAY_MIN
@@ -129,17 +131,24 @@ class GameBot:
             
             messages = await self.client.get_messages(self.game_chat, limit=2)
             
-            # Check for "don't rush" message indicating we need to wait
+            # Check for special messages
             for msg in messages:
-                if msg.text and ("Будь ласка, не поспішайте" in msg.text or "не поспішайте" in msg.text):
-                    logger.warning("Game says 'don't rush' - profile check failed")
-                    if retry_count < max_retries:
-                        logger.info(f"Retrying character status check in 60 seconds... (attempt {retry_count + 2}/{max_retries + 1})")
-                        await asyncio.sleep(60)  # Wait 1 minute before retry
-                        return await self.check_character_status(retry_count + 1)
-                    else:
-                        logger.error("Max retries reached for character status check")
-                        raise Exception("Failed to get character status after multiple attempts")
+                if msg.text:
+                    # Check if we're in battle (shouldn't check status during battle)
+                    if "Ви в бою!" in msg.text:
+                        logger.warning("Still in battle! Cannot check character status now")
+                        # Return current known values, battle will be handled in main loop
+                        return
+                    # Check for "don't rush" message
+                    elif "Будь ласка, не поспішайте" in msg.text or "не поспішайте" in msg.text:
+                        logger.warning("Game says 'don't rush' - profile check failed")
+                        if retry_count < max_retries:
+                            logger.info(f"Retrying character status check in 60 seconds... (attempt {retry_count + 2}/{max_retries + 1})")
+                            await asyncio.sleep(60)  # Wait 1 minute before retry
+                            return await self.check_character_status(retry_count + 1)
+                        else:
+                            logger.error("Max retries reached for character status check")
+                            raise Exception("Failed to get character status after multiple attempts")
             
             # Look for actual character profile
             profile_found = False
@@ -285,8 +294,8 @@ class GameBot:
         
         logger.info("Battle started!")
         
-        # Add reaction delay for human-like behavior
-        if self.config.HUMAN_LIKE > 0:
+        # Add reaction delay for human-like behavior (only outside working hours)
+        if self.config.HUMAN_LIKE > 0 and not await self.is_in_working_hours():
             # Longer initial reaction when battle starts
             reaction_delay = await self.get_human_like_pause("message_reading")
             await asyncio.sleep(reaction_delay)
@@ -600,13 +609,38 @@ class GameBot:
             }
             desc = level_descriptions.get(self.config.HUMAN_LIKE, "Unknown")
             logger.info(f"Human-like mode enabled - Level {self.config.HUMAN_LIKE} ({desc})")
+            
+            if self.config.EXPLORATION_START_HOUR != -1:
+                logger.info(f"Will use efficient mode during working hours ({self.config.EXPLORATION_START_HOUR}:00 - 12:00)")
+                logger.info(f"Human-like behavior active outside working hours")
         
         while self.is_running:
             try:
                 logger.info("=" * 50)  # Separator for new exploration cycle
                 
+                # Check if we switched modes
+                if self.config.HUMAN_LIKE > 0 and self.config.EXPLORATION_START_HOUR != -1:
+                    is_working_hours = await self.is_in_working_hours()
+                    if self.last_mode_was_working is not None and self.last_mode_was_working != is_working_hours:
+                        if is_working_hours:
+                            logger.info("⚡ Switched to EFFICIENT MODE (working hours started)")
+                        else:
+                            logger.info("🤖 Switched to HUMAN-LIKE MODE (working hours ended)")
+                    self.last_mode_was_working = is_working_hours
+                
                 # 🧍 Check character status
                 await self.check_character_status()
+                
+                # Check if we're in an ongoing battle (status check might have detected it)
+                messages = await self.client.get_messages(self.game_chat, limit=2)
+                for msg in messages:
+                    if msg.buttons:
+                        for row in msg.buttons:
+                            for btn in row:
+                                if btn.text and "Атака" in btn.text:
+                                    logger.warning("Detected ongoing battle! Handling it now...")
+                                    await self.handle_battle()
+                                    continue  # Continue main loop after battle
                 
                 # ❤️ Wait for full HP if needed
                 if self.current_hp < self.max_hp:
@@ -618,7 +652,7 @@ class GameBot:
                     await self.wait_for_energy()
                     continue
                 
-                # 🤖 Human-like: Decide if we should wait for full energy
+                # 🤖 Human-like: Decide if we should wait for full energy (only outside working hours)
                 if self.config.HUMAN_LIKE > 0 and not await self.is_in_working_hours():
                     if self.waiting_for_full_energy or await self.should_wait_for_full_energy():
                         if self.current_energy < self.max_energy:
@@ -639,7 +673,8 @@ class GameBot:
                             logger.info("Human-like: Energy is full, proceeding with exploration session")
                 
                 # 🚫 Check exploration restrictions (time window + energy limit)
-                # In human-like mode, ignore restrictions when outside working hours
+                # In human-like mode, ignore restrictions ONLY when outside working hours
+                # During working hours, bot operates in efficient mode with restrictions
                 if self.config.HUMAN_LIKE > 0 and not await self.is_in_working_hours():
                     # Track when energy becomes full
                     if self.current_energy >= self.max_energy:
@@ -683,7 +718,10 @@ class GameBot:
                         pause = await self.get_human_like_pause("before_energy_use")
                         logger.info(f"Human-like: Waiting {pause/60:.1f} minutes before starting exploration")
                         await asyncio.sleep(pause)
+                    
+                    # In human-like mode, we continue here without checking restrictions
                 elif not self.energy_tracker.can_explore_now():
+                    # This block only runs when HUMAN_LIKE == 0 (efficient mode)
                     # Check what's preventing exploration
                     if not self.energy_tracker.is_in_exploration_window():
                         time_until_window = self.energy_tracker.get_time_until_exploration_window()
@@ -711,7 +749,7 @@ class GameBot:
                             await asyncio.sleep(300)  # 5 minutes
                             logger.info(f"Still waiting for energy reset... {self.energy_tracker.get_time_until_reset()} remaining")
                         
-                        logger.info("Daily energy limit reset! Now waiting for exploration window...")
+                        logger.info("Daily energy limit reset!")
                         
                         # After reset, check if we need to wait for exploration window
                         if not self.energy_tracker.is_in_exploration_window():
@@ -731,32 +769,44 @@ class GameBot:
                 await self.explore()
                 
                 # Track energy usage
+                # Track energy when in efficient mode OR during working hours
                 if self.config.HUMAN_LIKE == 0 or await self.is_in_working_hours():
-                    # Only track energy limits during working hours
                     self.energy_tracker.use_energy(1)
                 
-                # Update human-like tracking
-                if self.config.HUMAN_LIKE > 0:
+                # Update human-like tracking (only relevant outside working hours)
+                if self.config.HUMAN_LIKE > 0 and not await self.is_in_working_hours():
                     self.last_activity_time = datetime.now()
                     self.energy_full_timestamp = None  # Reset since we just used energy
                 
                 # Check response
-                messages = await self.client.get_messages(self.game_chat, limit=2)
+                messages = await self.client.get_messages(self.game_chat, limit=3)  # Get more messages to be sure
                 
                 battle_started = False
                 camp_found = False
                 
                 for msg in messages:
-                    if msg.text:
-                        # Add reading delay for human-like behavior
-                        if self.config.HUMAN_LIKE > 0:
+                    # Check for battle buttons first (most reliable)
+                    if msg.buttons:
+                        for row in msg.buttons:
+                            for btn in row:
+                                if btn.text and "Атака" in btn.text:
+                                    battle_started = True
+                                    logger.info("Battle detected via attack button")
+                                    break
+                            if battle_started:
+                                break
+                    
+                    if msg.text and not battle_started:
+                        # Add reading delay for human-like behavior (only outside working hours)
+                        if self.config.HUMAN_LIKE > 0 and not await self.is_in_working_hours():
                             reading_delay = await self.get_message_reading_delay(msg.text)
                             if reading_delay > 0:
                                 await asyncio.sleep(reading_delay)
                         
-                        # ⚔️ Check if battle started
-                        if "З'явився" in msg.text or (msg.buttons and any("Атака" in btn.text for row in msg.buttons for btn in row if btn.text)):
+                        # ⚔️ Check if battle started by text
+                        if "З'явився" in msg.text or "Ви в бою!" in msg.text:
                             battle_started = True
+                            logger.info("Battle detected via message text")
                             break
                         # ⛺ Check for camp opportunity
                         elif ("покинутий табір" in msg.text or "табір" in msg.text.lower()) and msg.buttons:
@@ -797,16 +847,16 @@ class GameBot:
                 # ⚔️ Handle battle if started (either from exploration or camp)
                 if battle_started:
                     await self.handle_battle()
-                    if self.config.HUMAN_LIKE > 0:
+                    if self.config.HUMAN_LIKE > 0 and not await self.is_in_working_hours():
                         self.battle_session_count += 1
                         if self.config.HUMAN_LIKE >= 3:  # Only log at moderate level or higher
                             logger.info(f"Human-like: Battle {self.battle_session_count}/{self.session_battles_target} in current session")
                 elif camp_found:
                     logger.info("Camp exploration completed")
-                    if self.config.HUMAN_LIKE > 0:
+                    if self.config.HUMAN_LIKE > 0 and not await self.is_in_working_hours():
                         self.battle_session_count += 1  # Camps count as activity
                 
-                # 🤖 Human-like: Check if we should take a session break
+                # 🤖 Human-like: Check if we should take a session break (only outside working hours)
                 if self.config.HUMAN_LIKE > 0 and not await self.is_in_working_hours():
                     if self.battle_session_count >= self.session_battles_target:
                         logger.info(f"Human-like: Completed session with {self.battle_session_count} battles")
