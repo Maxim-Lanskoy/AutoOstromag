@@ -36,12 +36,4 @@ class Config:
     HUMAN_LIKE = int(os.getenv('HUMAN_LIKE', '0'))
     
     # Escape configuration - mobs to immediately run away from
-    ESCAPE_MOBS = [
-        "Великий Дикий Тур",
-        "Кусак Лютого Жала",
-        "Тінь Блукача",
-        "Тіньовий Яструб",
-        "Давній Павук-Могильник",
-        "Старший Дрантогор",
-        "Лютий Злоніч"
-    ]
+    ESCAPE_MOBS = []
