@@ -270,10 +270,14 @@ class GameBot:
             wait_seconds = (self.energy_regen_minutes * 60) + 30  # Add 30s buffer
             logger.info(f"Waiting {self.energy_regen_minutes} minutes for next energy...")
             await asyncio.sleep(wait_seconds)
+            # After waiting, check status to update energy values
+            await self.check_character_status()
         else:
             # Wait 5 minutes as default
             logger.info("Waiting 5 minutes for energy...")
             await asyncio.sleep(300)
+            # After waiting, check status to update energy values
+            await self.check_character_status()
     
     async def explore(self):
         """Send explore command"""
@@ -656,7 +660,10 @@ class GameBot:
                 # ⚡ Check if we have energy
                 if self.current_energy < 1:
                     await self.wait_for_energy()
-                    continue
+                    # After waiting and checking, if we still have no energy, continue waiting
+                    if self.current_energy < 1:
+                        continue
+                    # Otherwise we now have energy and can proceed
                 
                 # 🤖 Human-like: Decide if we should wait for full energy (only outside working hours)
                 if self.config.HUMAN_LIKE > 0 and not await self.is_in_working_hours():
