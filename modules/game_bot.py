@@ -106,10 +106,9 @@ class GameBot:
             self.game_chat = await self.client.get_entity(self.config.GAME_BOT_USERNAME)
             logger.info(f"Connected to game bot: {self.game_chat.username}")
             
-            # Send /start to refresh menu
+            # Don't send /start automatically - it's suspicious
+            # Just proceed to main loop directly
             await self.human_delay(2, 4)
-            await self.client.send_message(self.game_chat, '/start')
-            await asyncio.sleep(3)
             
             # Start main loop (it will handle profile check and HP wait)
             self.is_running = True
@@ -628,8 +627,13 @@ class GameBot:
                             logger.info("🤖 Switched to HUMAN-LIKE MODE (working hours ended)")
                     self.last_mode_was_working = is_working_hours
                 
-                # 🧍 Check character status
-                await self.check_character_status()
+                # 🧍 Check character status only when needed
+                # Always check on first iteration
+                if self.current_hp == 0 and self.max_hp == 1:  # Initial values, never checked
+                    await self.check_character_status()
+                # Always check if HP is not full (need to track regeneration)
+                elif self.current_hp < self.max_hp:
+                    await self.check_character_status()
                 
                 # Check if we're in an ongoing battle (status check might have detected it)
                 messages = await self.client.get_messages(self.game_chat, limit=2)
@@ -640,6 +644,8 @@ class GameBot:
                                 if btn.text and "Атака" in btn.text:
                                     logger.warning("Detected ongoing battle! Handling it now...")
                                     await self.handle_battle()
+                                    # Check status after handling the battle
+                                    await self.check_character_status()
                                     continue  # Continue main loop after battle
                 
                 # ❤️ Wait for full HP if needed
@@ -673,9 +679,15 @@ class GameBot:
                             logger.info("Human-like: Energy is full, proceeding with exploration session")
                 
                 # 🚫 Check exploration restrictions (time window + energy limit)
-                # In human-like mode, ignore restrictions ONLY when outside working hours
-                # During working hours, bot operates in efficient mode with restrictions
-                if self.config.HUMAN_LIKE > 0 and not await self.is_in_working_hours():
+                # IMPORTANT: When HUMAN_LIKE > 0 and outside working hours, ignore ALL restrictions
+                # Only apply restrictions in two cases:
+                # 1. HUMAN_LIKE == 0 (efficient mode always)
+                # 2. HUMAN_LIKE > 0 BUT currently in working hours (efficient mode during work)
+                
+                is_human_mode_active = self.config.HUMAN_LIKE > 0 and not await self.is_in_working_hours()
+                
+                if is_human_mode_active:
+                    # Human-like mode is active - ignore all restrictions and continue with human-like behavior
                     # Track when energy becomes full
                     if self.current_energy >= self.max_energy:
                         if self.energy_full_timestamp is None:
@@ -719,57 +731,102 @@ class GameBot:
                         logger.info(f"Human-like: Waiting {pause/60:.1f} minutes before starting exploration")
                         await asyncio.sleep(pause)
                     
-                    # In human-like mode, we continue here without checking restrictions
-                elif not self.energy_tracker.can_explore_now():
-                    # This block only runs when HUMAN_LIKE == 0 (efficient mode)
-                    # Check what's preventing exploration
-                    if not self.energy_tracker.is_in_exploration_window():
-                        time_until_window = self.energy_tracker.get_time_until_exploration_window()
-                        start_hour = self.energy_tracker.exploration_start_hour
-                        logger.warning(f"Outside exploration window (starts at {start_hour:02d}:00)! "
-                                     f"Waiting {time_until_window} until exploration time")
-                        
-                        # Wait until exploration window opens (check every 10 minutes)
-                        while not self.energy_tracker.is_in_exploration_window():
-                            await asyncio.sleep(600)  # 10 minutes
-                            time_remaining = self.energy_tracker.get_time_until_exploration_window()
-                            logger.info(f"Still waiting for exploration window... {time_remaining} remaining")
-                        
-                        logger.info(f"Exploration window opened! ({start_hour:02d}:00 - 12:00)")
-                        continue
+                    # In human-like mode outside working hours, we ALWAYS continue without checking restrictions
+                    # The bot should explore regardless of energy limits or time windows
                     
-                    elif not self.energy_tracker.can_use_energy():
-                        remaining_energy = self.energy_tracker.get_remaining_energy()
-                        time_until_reset = self.energy_tracker.get_time_until_reset()
-                        logger.warning(f"Daily energy limit reached ({self.energy_tracker.daily_limit})! "
-                                     f"Waiting {time_until_reset} until reset at 12:00")
-                        
-                        # Wait until energy resets (check every 5 minutes)
-                        while not self.energy_tracker.can_use_energy():
-                            await asyncio.sleep(300)  # 5 minutes
-                            logger.info(f"Still waiting for energy reset... {self.energy_tracker.get_time_until_reset()} remaining")
-                        
-                        logger.info("Daily energy limit reset!")
-                        
-                        # After reset, check if we need to wait for exploration window
+                else:
+                    # Efficient mode (either HUMAN_LIKE == 0 or we're in working hours)
+                    # Apply all restrictions normally
+                    if not self.energy_tracker.can_explore_now():
+                        # Check what's preventing exploration
                         if not self.energy_tracker.is_in_exploration_window():
                             time_until_window = self.energy_tracker.get_time_until_exploration_window()
                             start_hour = self.energy_tracker.exploration_start_hour
-                            logger.info(f"Waiting {time_until_window} until exploration window opens at {start_hour:02d}:00")
                             
-                            while not self.energy_tracker.is_in_exploration_window():
-                                await asyncio.sleep(600)  # 10 minutes
-                                time_remaining = self.energy_tracker.get_time_until_exploration_window()
-                                logger.info(f"Still waiting for exploration window... {time_remaining} remaining")
+                            # If HUMAN_LIKE > 0, we should switch to human mode when window closes
+                            if self.config.HUMAN_LIKE > 0:
+                                logger.info(f"Working hours ended. Switching to human-like mode (Level {self.config.HUMAN_LIKE})")
+                                # Don't wait, just continue in human-like mode
+                                continue
+                            else:
+                                logger.warning(f"Outside exploration window (starts at {start_hour:02d}:00)! "
+                                             f"Waiting {time_until_window} until exploration time")
+                                
+                                # Wait until exploration window opens (check every 10 minutes)
+                                while not self.energy_tracker.is_in_exploration_window():
+                                    await asyncio.sleep(600)  # 10 minutes
+                                    time_remaining = self.energy_tracker.get_time_until_exploration_window()
+                                    logger.info(f"Still waiting for exploration window... {time_remaining} remaining")
+                                
+                                logger.info(f"Exploration window opened! ({start_hour:02d}:00 - 12:00)")
+                                continue
                         
-                        logger.info("Ready to explore!")
-                        continue
+                        elif not self.energy_tracker.can_use_energy():
+                            remaining_energy = self.energy_tracker.get_remaining_energy()
+                            time_until_reset = self.energy_tracker.get_time_until_reset()
+                            
+                            # If HUMAN_LIKE > 0 and we're outside working hours now, switch to human mode
+                            if self.config.HUMAN_LIKE > 0 and not await self.is_in_working_hours():
+                                logger.info(f"Energy limit reached but outside working hours. Switching to human-like mode (Level {self.config.HUMAN_LIKE})")
+                                # Don't wait, just continue in human-like mode
+                                continue
+                            else:
+                                logger.warning(f"Daily energy limit reached ({self.energy_tracker.daily_limit})! "
+                                             f"Waiting {time_until_reset} until reset at 12:00")
+                                
+                                # Wait until energy resets (check every 5 minutes)
+                                while not self.energy_tracker.can_use_energy():
+                                    # Check if we should switch to human mode
+                                    if self.config.HUMAN_LIKE > 0 and not await self.is_in_working_hours():
+                                        logger.info(f"Working hours ended. Switching to human-like mode (Level {self.config.HUMAN_LIKE})")
+                                        break  # Exit wait loop and continue in human mode
+                                    
+                                    await asyncio.sleep(300)  # 5 minutes
+                                    logger.info(f"Still waiting for energy reset... {self.energy_tracker.get_time_until_reset()} remaining")
+                                
+                                # If we broke out due to mode switch, continue
+                                if self.config.HUMAN_LIKE > 0 and not await self.is_in_working_hours():
+                                    continue
+                                
+                                logger.info("Daily energy limit reset!")
+                                
+                                # After reset, check if we need to wait for exploration window
+                                if not self.energy_tracker.is_in_exploration_window():
+                                    time_until_window = self.energy_tracker.get_time_until_exploration_window()
+                                    start_hour = self.energy_tracker.exploration_start_hour
+                                    logger.info(f"Waiting {time_until_window} until exploration window opens at {start_hour:02d}:00")
+                                    
+                                    while not self.energy_tracker.is_in_exploration_window():
+                                        await asyncio.sleep(600)  # 10 minutes
+                                        time_remaining = self.energy_tracker.get_time_until_exploration_window()
+                                        logger.info(f"Still waiting for exploration window... {time_remaining} remaining")
+                                
+                                logger.info("Ready to explore!")
+                                continue
                 
                 # 🗺️ Explore
+                # Check status before exploring to catch manual play or changes
+                # Add some randomization to avoid predictable patterns
+                if random.random() < 0.7 or self.current_hp < self.max_hp:  # 70% chance or if HP not full
+                    await self.check_character_status()
+                
+                # Only explore if we still have HP and energy after the check
+                if self.current_hp < self.max_hp:
+                    logger.info("HP not full after status check, need to wait")
+                    continue
+                if self.current_energy < 1:
+                    logger.info("No energy after status check")
+                    continue
+                    
                 await self.explore()
                 
-                # Track energy usage
-                # Track energy when in efficient mode OR during working hours
+                # Decrease energy after exploration (we just used 1 energy)
+                if self.current_energy > 0:
+                    self.current_energy -= 1
+                
+                # Track energy usage for daily limits
+                # Only track energy when in efficient mode (HUMAN_LIKE == 0 OR during working hours)
+                # Don't track in human-like mode outside working hours
                 if self.config.HUMAN_LIKE == 0 or await self.is_in_working_hours():
                     self.energy_tracker.use_energy(1)
                 
@@ -847,12 +904,16 @@ class GameBot:
                 # ⚔️ Handle battle if started (either from exploration or camp)
                 if battle_started:
                     await self.handle_battle()
+                    # ALWAYS check status after battle to update HP
+                    await self.check_character_status()
                     if self.config.HUMAN_LIKE > 0 and not await self.is_in_working_hours():
                         self.battle_session_count += 1
                         if self.config.HUMAN_LIKE >= 3:  # Only log at moderate level or higher
                             logger.info(f"Human-like: Battle {self.battle_session_count}/{self.session_battles_target} in current session")
                 elif camp_found:
                     logger.info("Camp exploration completed")
+                    # Check status after camp in case rewards affected HP/energy
+                    await self.check_character_status()
                     if self.config.HUMAN_LIKE > 0 and not await self.is_in_working_hours():
                         self.battle_session_count += 1  # Camps count as activity
                 
