@@ -635,9 +635,6 @@ class GameBot:
                 # Always check on first iteration
                 if self.current_hp == 0 and self.max_hp == 1:  # Initial values, never checked
                     await self.check_character_status()
-                # Always check if HP is not full (need to track regeneration)
-                elif self.current_hp < self.max_hp:
-                    await self.check_character_status()
                 
                 # Check if we're in an ongoing battle (status check might have detected it)
                 messages = await self.client.get_messages(self.game_chat, limit=2)
@@ -650,11 +647,15 @@ class GameBot:
                                     await self.handle_battle()
                                     # Check status after handling the battle
                                     await self.check_character_status()
+                                    self._last_status_check_time = datetime.now()  # Mark that we just checked
                                     continue  # Continue main loop after battle
                 
                 # ❤️ Wait for full HP if needed
                 if self.current_hp < self.max_hp:
                     await self.wait_for_full_hp()
+                    # HP should be full now, but double-check
+                    if self.current_hp < self.max_hp:
+                        await self.check_character_status()
                     continue
                 
                 # ⚡ Check if we have energy
@@ -813,17 +814,31 @@ class GameBot:
                 
                 # 🗺️ Explore
                 # Check status before exploring to catch manual play or changes
-                # Add some randomization to avoid predictable patterns
-                if random.random() < 0.7 or self.current_hp < self.max_hp:  # 70% chance or if HP not full
-                    await self.check_character_status()
+                # But only if we haven't checked recently (avoid double checks)
+                should_check_before_explore = False
                 
-                # Only explore if we still have HP and energy after the check
-                if self.current_hp < self.max_hp:
-                    logger.info("HP not full after status check, need to wait")
-                    continue
-                if self.current_energy < 1:
-                    logger.info("No energy after status check")
-                    continue
+                # Check if we need to update status
+                if not hasattr(self, '_last_status_check_time'):
+                    should_check_before_explore = True
+                else:
+                    time_since_last_check = (datetime.now() - self._last_status_check_time).total_seconds()
+                    # Check if more than 30 seconds passed since last check
+                    if time_since_last_check > 30:
+                        # Random chance to check (70%) or always if HP might not be full
+                        if random.random() < 0.7 or self.current_hp < self.max_hp:
+                            should_check_before_explore = True
+                
+                if should_check_before_explore:
+                    await self.check_character_status()
+                    self._last_status_check_time = datetime.now()
+                    
+                    # Only explore if we still have HP and energy after the check
+                    if self.current_hp < self.max_hp:
+                        logger.info("HP not full after status check, need to wait")
+                        continue
+                    if self.current_energy < 1:
+                        logger.info("No energy after status check")
+                        continue
                     
                 await self.explore()
                 
@@ -913,6 +928,7 @@ class GameBot:
                     await self.handle_battle()
                     # ALWAYS check status after battle to update HP
                     await self.check_character_status()
+                    self._last_status_check_time = datetime.now()  # Mark that we just checked
                     if self.config.HUMAN_LIKE > 0 and not await self.is_in_working_hours():
                         self.battle_session_count += 1
                         if self.config.HUMAN_LIKE >= 3:  # Only log at moderate level or higher
@@ -921,6 +937,7 @@ class GameBot:
                     logger.info("Camp exploration completed")
                     # Check status after camp in case rewards affected HP/energy
                     await self.check_character_status()
+                    self._last_status_check_time = datetime.now()  # Mark that we just checked
                     if self.config.HUMAN_LIKE > 0 and not await self.is_in_working_hours():
                         self.battle_session_count += 1  # Camps count as activity
                 
