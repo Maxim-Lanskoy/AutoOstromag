@@ -669,6 +669,8 @@ class GameBot:
                 # 🤖 Human-like: Decide if we should wait for full energy (only outside working hours)
                 if self.config.HUMAN_LIKE > 0 and not await self.is_in_working_hours():
                     if self.waiting_for_full_energy or await self.should_wait_for_full_energy():
+                        # Check current status to get fresh energy value
+                        await self.check_status()
                         if self.current_energy < self.max_energy:
                             if not self.waiting_for_full_energy:
                                 wait_time = await self.get_human_like_pause("waiting_for_full")
