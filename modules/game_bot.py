@@ -73,24 +73,24 @@ class GameBot:
         if max_seconds is None:
             max_seconds = self.config.HUMAN_DELAY_MAX
         
-        # Scale delays based on human-like level
+        # Scale delays based on human-like level (rebalanced levels)
         level_multipliers = {
             1: 0.3,   # 30% of configured delays
             2: 0.6,   # 60% of configured delays
-            3: 1.0,   # 100% of configured delays
-            4: 1.5,   # 150% of configured delays
-            5: 2.5    # 250% of configured delays
+            3: 0.8,   # 80% of configured delays (new level between 2 and 4)
+            4: 1.0,   # 100% of configured delays (was old 3)
+            5: 1.5    # 150% of configured delays (was old 4)
         }
         
         multiplier = level_multipliers.get(self.config.HUMAN_LIKE, 1.0)
         
-        # Apply fatigue factor at levels 3+ (slower reactions after playing for a while)
+        # Apply fatigue factor at levels 4+ (slower reactions after playing for a while)
         fatigue_multiplier = 1.0
-        if self.config.HUMAN_LIKE >= 3 and self.session_start_time:
+        if self.config.HUMAN_LIKE >= 4 and self.session_start_time:
             session_duration = (datetime.now() - self.session_start_time).total_seconds() / 3600  # hours
             if session_duration > 1:  # After 1 hour
-                # Gradually increase delays up to 50% at level 3, 75% at level 4, 100% at level 5
-                max_fatigue = {3: 0.5, 4: 0.75, 5: 1.0}.get(self.config.HUMAN_LIKE, 0.5)
+                # Gradually increase delays up to 50% at level 4, 75% at level 5
+                max_fatigue = {4: 0.5, 5: 0.75}.get(self.config.HUMAN_LIKE, 0.5)
                 fatigue_multiplier = 1 + (min(session_duration - 1, 2) / 2) * max_fatigue
         
         delay = random.uniform(min_seconds * multiplier * fatigue_multiplier, 
@@ -495,15 +495,15 @@ class GameBot:
         level = self.config.HUMAN_LIKE
         if level == 0:
             return 0  # No delays
-        
+
         # Base delays that scale with level
         delay_multipliers = {
             0: 0,
             1: 0.1,   # 10% of base delays
             2: 0.3,   # 30% of base delays
-            3: 1.0,   # 100% of base delays (original values)
-            4: 2.0,   # 200% of base delays
-            5: 5.0    # 500% of base delays
+            3: 0.6,   # 60% of base delays (new mid level)
+            4: 1.0,   # 100% of base delays (was old 3)
+            5: 2.0    # 200% of base delays (was old 4)
         }
         
         multiplier = delay_multipliers.get(level, 1.0)
@@ -540,11 +540,11 @@ class GameBot:
         
         # Chance to wait for full energy scales with level
         wait_chances = {
-            1: 0.05,  # 5% chance
-            2: 0.15,  # 15% chance
-            3: 0.30,  # 30% chance
-            4: 0.45,  # 45% chance
-            5: 0.60   # 60% chance
+            1: 0.05,  # 5%
+            2: 0.12,  # 12%
+            3: 0.20,  # 20%
+            4: 0.30,  # 30% (was old 3)
+            5: 0.45   # 45% (was old 4)
         }
         
         chance = wait_chances.get(level, 0.3)
@@ -556,13 +556,29 @@ class GameBot:
     
     async def is_in_working_hours(self):
         """Check if we're in the configured working time window"""
+        now = datetime.now()
+        current_hour = now.hour
+
+        # Special raid days: Tuesday(1), Thursday(3), Sunday(6)
+        weekday = now.weekday()
+        is_raid_day = weekday in (1, 3, 6)
+
+        # Raid days:
+        # - 20:00-22:00: always working hours (efficient mode)
+        # - >=22: enforce efficient mode until configured working hours take over or end (prevents human-like)
+        if is_raid_day:
+            if 20 <= current_hour < 22:
+                return True
+            if current_hour >= 22:
+                return True
+
+        # Non-raid days: follow configured working hours
         if self.config.EXPLORATION_START_HOUR == -1:
             return False  # No time window configured
-        
-        current_hour = datetime.now().hour
+
         start_hour = self.config.EXPLORATION_START_HOUR
         end_hour = 12  # Always ends at noon
-        
+
         if start_hour > end_hour:
             # Handles midnight crossover (e.g., 23:00 - 12:00)
             return current_hour >= start_hour or current_hour < end_hour
@@ -585,9 +601,9 @@ class GameBot:
         level_multipliers = {
             1: 0.2,   # Very fast reading
             2: 0.5,   # Fast reading
-            3: 1.0,   # Normal reading speed
-            4: 1.5,   # Careful reading
-            5: 2.0    # Very careful reading
+            3: 0.8,   # Between fast and normal
+            4: 1.0,   # Normal reading speed (was old 3)
+            5: 1.5    # Careful reading (was old 4)
         }
         
         multiplier = level_multipliers.get(self.config.HUMAN_LIKE, 1.0)
@@ -606,9 +622,9 @@ class GameBot:
             level_descriptions = {
                 1: "Minimal - slight randomization",
                 2: "Light - basic patterns",
-                3: "Moderate - realistic patterns",
-                4: "Heavy - very human-like",
-                5: "Maximum - most human-like but inefficient"
+                3: "Balanced - moderate human-like",
+                4: "Realistic - human-like patterns",
+                5: "Heavy - very human-like"
             }
             desc = level_descriptions.get(self.config.HUMAN_LIKE, "Unknown")
             logger.info(f"Human-like mode enabled - Level {self.config.HUMAN_LIKE} ({desc})")
@@ -729,6 +745,22 @@ class GameBot:
                             self.session_battles_target = random.randint(3, 5)  # Moderate
                         else:
                             self.session_battles_target = random.randint(2, 4)  # Fewer battles at higher levels
+
+                        # Daytime boost (12:00 - 19:00): subtly increase chance to spend all energy
+                        # Keep original randomness but probabilistically push target higher
+                        try:
+                            hour_now = datetime.now().hour
+                            if 12 <= hour_now < 19 and self.current_energy > 0:
+                                # Probability scales mildly with human-like level
+                                p = min(0.15 + 0.05 * max(0, self.config.HUMAN_LIKE - 1), 0.45)
+                                if random.random() < p:
+                                    # Push target toward depleting current energy in this session
+                                    desired = self.battle_session_count + self.current_energy
+                                    jitter = random.randint(-1, 2)  # small randomness
+                                    desired = max(1, desired + jitter)
+                                    self.session_battles_target = max(self.session_battles_target, desired)
+                        except Exception:
+                            pass
                         
                         # Mark session start time for fatigue tracking
                         if not self.session_start_time:
@@ -849,10 +881,15 @@ class GameBot:
                     self.current_energy -= 1
                 
                 # Track energy usage for daily limits
-                # Only track energy when in efficient mode (HUMAN_LIKE == 0 OR during working hours)
-                # Don't track in human-like mode outside working hours
-                if self.config.HUMAN_LIKE == 0 or await self.is_in_working_hours():
-                    self.energy_tracker.use_energy(1)
+                # - During raid window: spend energy regardless of limit, but only count usage up to the limit
+                # - Otherwise: count only in efficient mode (HUMAN_LIKE == 0 OR during working hours)
+                is_working = await self.is_in_working_hours()
+                if hasattr(self.energy_tracker, "_is_raid_window_now") and self.energy_tracker._is_raid_window_now():
+                    if self.energy_tracker.daily_limit <= 0 or self.energy_tracker.energy_used < self.energy_tracker.daily_limit:
+                        self.energy_tracker.use_energy(1)
+                else:
+                    if self.config.HUMAN_LIKE == 0 or is_working:
+                        self.energy_tracker.use_energy(1)
                 
                 # Update human-like tracking (only relevant outside working hours)
                 if self.config.HUMAN_LIKE > 0 and not await self.is_in_working_hours():
@@ -933,7 +970,7 @@ class GameBot:
                     self._last_status_check_time = datetime.now()  # Mark that we just checked
                     if self.config.HUMAN_LIKE > 0 and not await self.is_in_working_hours():
                         self.battle_session_count += 1
-                        if self.config.HUMAN_LIKE >= 3:  # Only log at moderate level or higher
+                        if self.config.HUMAN_LIKE >= 4:  # Only log at moderate level or higher
                             logger.info(f"Human-like: Battle {self.battle_session_count}/{self.session_battles_target} in current session")
                 elif camp_found:
                     logger.info("Camp exploration completed")
@@ -945,6 +982,18 @@ class GameBot:
                 
                 # 🤖 Human-like: Check if we should take a session break (only outside working hours)
                 if self.config.HUMAN_LIKE > 0 and not await self.is_in_working_hours():
+                    # Daytime incremental bias: occasionally extend target to spend remaining energy
+                    try:
+                        hour_now = datetime.now().hour
+                        if 12 <= hour_now < 19 and self.current_energy > 0 and (battle_started or camp_found):
+                            p_ext = min(0.1 + 0.04 * max(0, self.config.HUMAN_LIKE - 1), 0.35)
+                            if random.random() < p_ext:
+                                desired = self.battle_session_count + self.current_energy
+                                jitter = random.randint(-1, 1)
+                                desired = max(1, desired + jitter)
+                                self.session_battles_target = max(self.session_battles_target, desired)
+                    except Exception:
+                        pass
                     if self.battle_session_count >= self.session_battles_target:
                         logger.info(f"Human-like: Completed session with {self.battle_session_count} battles")
                         self.battle_session_count = 0

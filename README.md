@@ -2,6 +2,20 @@
 
 AutoOstromag is a clean, and efficient automated userbot for the Ukrainian Telegram RPG game "Таємниці Королівства Остромаг" (@ostromag_game_bot). The bot automatically levels up your character through exploration and combat with minimal complexity and maximum reliability.
 
+## 🔔 Recent Changes
+
+- **Raid Window Override:** On Tue/Thu/Sun between `20:00–22:00`, exploration is always allowed regardless of `EXPLORATION_START_HOUR` and `DAILY_ENERGY_LIMIT`. The energy counter increments only up to the daily limit; beyond that, the bot keeps spending energy without incrementing the counter.
+- **Pre-/Post-raid Behavior:**
+  - Before 20:00 on raid days, the bot follows your normal configuration. If your configured working window is active (e.g., `EXPLORATION_START_HOUR=15`), it explores with limits as usual.
+  - After 22:00 on raid days, efficient mode is enforced (prevents human-like mode). The bot continues only if your configured working window is active; otherwise it waits. If `EXPLORATION_START_HOUR=-1` (always explore), it continues after 22:00.
+- **Daytime Energy Bias (12:00–19:00):** Subtle, randomized bias that sometimes nudges sessions to spend all currently available energy between human-like pauses. Keeps existing human-like flow, just a higher chance to fully deplete energy during the day.
+- **HUMAN_LIKE Rebalance:**
+  - Old level 3 → new level 4 (same intensity as before).
+  - New level 3 inserted between old 2 and 3 (balanced).
+  - Old level 5 removed; new level 5 corresponds to previous level 4 intensity.
+  - Delay multipliers, reading speeds, fatigue thresholds, and full-energy wait chances updated accordingly.
+- **Env Templates Synced:** `.env.example` comments updated to reflect the new HUMAN_LIKE scale. Your `.env` values remain unchanged.
+
 ## 🚀 What the Bot Does
 
 The bot follows a **simple, linear flow**:
@@ -63,6 +77,10 @@ DAILY_ENERGY_LIMIT=0
 
 # Exploration time window (-1 = always explore, 0-23 = start hour)
 EXPLORATION_START_HOUR=-1
+
+# Human-like behavior (0-5; rebalanced levels)
+# 0 = Disabled | 1 = Minimal | 2 = Light | 3 = Balanced | 4 = Realistic (old 3) | 5 = Heavy (old 4)
+HUMAN_LIKE=0
 ```
 
 ### 🏃 Escape Mobs Configuration
@@ -106,6 +124,7 @@ Control when and how much the bot explores:
 2. Uses energy within daily limit
 3. When limit reached, waits for 12:00 reset
 4. After reset, waits for next exploration window
+5. Raid days (Tue/Thu/Sun): 20:00–22:00 always allowed (ignores window + limit). Counter increments up to the limit; post‑22:00 normal rules apply again (unless `EXPLORATION_START_HOUR=-1`, which continues).
 
 ## 🛠️ Installation & Setup
 

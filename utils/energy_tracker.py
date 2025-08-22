@@ -4,7 +4,7 @@ Energy tracking system for daily automation limits
 
 import json
 import os
-from datetime import datetime, time
+from datetime import datetime, time, timedelta
 from pathlib import Path
 
 from utils.logger import setup_logger
@@ -127,16 +127,28 @@ class EnergyTracker:
         minutes = int((time_diff.total_seconds() % 3600) // 60)
         
         return f"{hours}h {minutes}m"
+
+    def _is_raid_window_now(self) -> bool:
+        """Return True during raid window (Tue/Thu/Sun 20:00-22:00)."""
+        now = datetime.now()
+        weekday = now.weekday()  # Monday=0
+        if weekday in (1, 3, 6):  # Tue, Thu, Sun
+            return 20 <= now.hour < 22
+        return False
     
     def is_in_exploration_window(self) -> bool:
         """Check if current time is within exploration window"""
-        # If no time restriction, always allow
-        if self.exploration_start_hour < 0:
-            return True
-        
         now = datetime.now()
         current_hour = now.hour
-        
+
+        # Raid window overrides configured hour and daily limit checks elsewhere
+        if self._is_raid_window_now():
+            return True
+
+        # Non-raid days: follow normal rules
+        if self.exploration_start_hour < 0:
+            return True
+
         # Exploration window: start_hour to 12:00 (reset time)
         # Handle case where window crosses midnight (e.g., 23:00 to 12:00)
         if self.exploration_start_hour <= 12:
@@ -148,34 +160,42 @@ class EnergyTracker:
     
     def get_time_until_exploration_window(self) -> str:
         """Get time remaining until exploration window opens"""
-        if self.exploration_start_hour < 0 or self.is_in_exploration_window():
-            return "0h 0m"
-        
         now = datetime.now()
-        
+
+        if self._is_raid_window_now() or self.is_in_exploration_window():
+            return "0h 0m"
+
+        # Non-raid days: original logic
+        if self.exploration_start_hour < 0:
+            return "0h 0m"
+
         # Calculate next exploration start time
         if now.hour < self.exploration_start_hour:
             # Same day
             start_time = now.replace(hour=self.exploration_start_hour, minute=0, second=0, microsecond=0)
         else:
             # Next day
-            tomorrow = now.replace(hour=self.exploration_start_hour, minute=0, second=0, microsecond=0)
-            start_time = tomorrow.replace(day=tomorrow.day + 1)
-        
+            tomorrow = now + timedelta(days=1)
+            start_time = tomorrow.replace(hour=self.exploration_start_hour, minute=0, second=0, microsecond=0)
+
         time_diff = start_time - now
         hours = int(time_diff.total_seconds() // 3600)
         minutes = int((time_diff.total_seconds() % 3600) // 60)
-        
+
         return f"{hours}h {minutes}m"
     
     def can_explore_now(self) -> bool:
         """Check if bot can explore now (considering both energy limit and time window)"""
         # Check daily reset first
         self.check_daily_reset()
-        
+
+        # During raid window, always allow exploration regardless of limits
+        if self._is_raid_window_now():
+            return True
+
         # Check time window
         if not self.is_in_exploration_window():
             return False
-        
+
         # Check energy limit
         return self.can_use_energy()
