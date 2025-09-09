@@ -25,7 +25,7 @@ class BuyingBot:
     Specialized bot for buying resources from the game shop
     """
     
-    def __init__(self, client, config, item_to_buy="Шкіряні Чоботи", quantity=100):
+    def __init__(self, client, config, item_to_buy="Шкіряні Чоботи", quantity=50):
         """Initialize buying bot with client and configuration"""
         self.client = client
         self.config = config
@@ -282,7 +282,7 @@ async def main():
     import argparse
     parser = argparse.ArgumentParser(description='AutoOstromag Buying Bot')
     parser.add_argument('--item', default='Шкіряні Чоботи', help='Item to buy (default: Шкіряні Чоботи)')
-    parser.add_argument('--quantity', type=int, default=100, help='Quantity to buy (default: 100)')
+    parser.add_argument('--quantity', type=int, default=50, help='Quantity to buy (default: 50)')
     args = parser.parse_args()
     
     # Create client
